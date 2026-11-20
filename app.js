@@ -78,7 +78,6 @@ Object.entries(propertyInputs).forEach(([name, input]) => {
 
 // --- Initialization ---
 function init() {
-    setupEventListeners();
     updateToolUI();
 }
 
