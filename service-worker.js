@@ -1,16 +1,14 @@
 const prefix = 'pro-pdf-editor-';
-const cacheName = prefix + '2026-11-20-7';
+const cacheName = prefix + '2026-11-20-8';
 const shell = [
     './', './index.html', './style.css', './app.js', './organizer.js', './document-tools.js',
     './versions.js', './install.js', './fonts.js', './signature.js', './allura-latin.woff2', './manifest.webmanifest', './favicon.svg', './icon-192.png', './icon-512.png',
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js'
+    './vendor/pdf.min.js', './vendor/pdf.worker.min.js', './vendor/pdf-lib.min.js'
 ].map(path => new URL(path, self.registration.scope).href);
 const cachedAssets = new Set(shell);
 
 self.addEventListener('install', event => {
-    event.waitUntil(caches.open(cacheName).then(cache => cache.addAll(shell)));
+    event.waitUntil(caches.open(cacheName).then(cache => cache.addAll(shell)).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', event => {
     event.waitUntil(caches.keys().then(keys => Promise.all(

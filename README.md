@@ -4,7 +4,7 @@ Open, annotate, and organize PDFs in your browser. PDF.js renders pages and extr
 
 ## Run the web app
 
-From this directory, run `python -m http.server 8000` and open `http://localhost:8000` in a modern browser. This source version loads its pinned PDF libraries from a CDN. Documents are processed in the browser.
+From this directory, run `python -m http.server 8000` and open `http://localhost:8000` in a modern browser. This source version serves its pinned PDF libraries locally. Documents are processed in the browser.
 
 ## Edit a PDF
 
@@ -51,3 +51,5 @@ Choose Helvetica, Times, or Courier, with regular, bold, and italic styles, in *
 Open **Sign** to type your name or draw with a mouse, finger, or stylus. Choose **Place signature**, then click or tap the PDF. The signature is a movable, resizable visual mark and is included in the exported document.
 
 On phones, **Undo** and **Redo** sit between **Open PDF** and **Save PDF**. They restore the edit history while keeping the current scroll position. Use **Done** on the phone keyboard to finish entering text.
+
+The phone toolbar keeps Open, Undo, Redo and Save at the top. Use **More** for zoom, rotation, Properties, Versions, Pages and Auto-organize. The PDF libraries are served with the editor and cached for offline use.

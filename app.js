@@ -1,4 +1,6 @@
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+if (globalThis.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = './vendor/pdf.worker.min.js';
+}
 
 const state = {
     originalBytes: null,
@@ -127,6 +129,27 @@ function init() {
     populateFontPicker(propertyInputs.textFont);
     updatePageControls();
     updateToolUI();
+    const more = document.getElementById('btnMore');
+    const menu = document.getElementById('toolbarMenu');
+    function setMenu(open) {
+        more.setAttribute('aria-expanded', String(open));
+        menu.classList.toggle('is-open', open);
+    }
+    more.addEventListener('click', () => setMenu(more.getAttribute('aria-expanded') !== 'true'));
+    menu.addEventListener('click', event => {
+        if (event.target.closest('button') && !event.target.closest('.zoom-controls, .rotation-controls')) setMenu(false);
+    });
+    document.addEventListener('click', event => {
+        if (!menu.contains(event.target) && !more.contains(event.target)) setMenu(false);
+    });
+    more.closest('header').addEventListener('keydown', event => {
+        if (event.key === 'Escape' && more.getAttribute('aria-expanded') === 'true') {
+            setMenu(false);
+            more.focus();
+        }
+    });
+    const phoneLayout = matchMedia('(max-width: 620px)');
+    phoneLayout.addEventListener?.('change', () => setMenu(false));
     const properties = document.getElementById('btnProperties');
     properties.addEventListener('click', () => {
         const open = properties.getAttribute('aria-expanded') !== 'true';
@@ -136,7 +159,6 @@ function init() {
 }
 
 // --- Loading & Rendering ---
-document.getElementById('btnOpen').addEventListener('click', () => fileInput.click());
 document.getElementById('btnChoose').addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', () => {
     const file = fileInput.files[0];
@@ -162,10 +184,13 @@ dropZone.addEventListener('drop', event => {
 
 async function openPDF(file) {
     if (!loader.classList.contains('hidden')) return;
+    document.getElementById('btnMore').setAttribute('aria-expanded', 'false');
+    document.getElementById('toolbarMenu').classList.remove('is-open');
     loaderText.textContent = 'Opening PDF…';
     loader.classList.remove('hidden');
     let loadingTask;
     try {
+        if (!globalThis.pdfjsLib || !globalThis.PDFLib) throw new Error('The editor files did not load. Reopen the app and try again.');
         const bytes = await file.arrayBuffer();
         loadingTask = pdfjsLib.getDocument({ data: bytes.slice(0), isEvalSupported: false });
         const documentToOpen = await loadingTask.promise;
