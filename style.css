@@ -45,6 +45,9 @@ button, label { user-select: none; }
 .brand-mark { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; color: white; background: linear-gradient(135deg, #8290ff, #5967f2); box-shadow: 0 5px 18px rgba(109, 124, 255, .4); }
 .divider { width: 1px; height: 25px; background: var(--line); margin: 0 7px; }
 .spacer { flex: 1; }
+.page-controls { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: .76rem; white-space: nowrap; }
+.page-controls input { width: 36px; height: 30px; text-align: center; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; outline: none; font-size: .78rem; }
+.page-controls input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(109, 124, 255, .18); }
 
 .btn { border: 1px solid var(--line); border-radius: 9px; padding: 9px 13px; cursor: pointer; color: var(--text); background: var(--surface); display: inline-flex; align-items: center; justify-content: center; gap: 7px; font-size: .82rem; font-weight: 650; transition: .18s ease; }
 .btn:hover:not(:disabled) { background: var(--surface-hover); border-color: rgba(148, 163, 184, .3); transform: translateY(-1px); }
@@ -116,6 +119,8 @@ button, label { user-select: none; }
     .brand { margin-right: 3px; }
     .brand span:last-child { display: none; }
     .divider { display: none; }
+    .page-controls { display: none; }
+    #btnFitWidth { display: none; }
     .shortcut-hint { display: none; }
 }
 @media (max-width: 620px) {
@@ -123,6 +128,7 @@ button, label { user-select: none; }
     #top-toolbar { min-height: 58px; }
     #top-toolbar .btn { padding: 8px 9px; }
     #top-toolbar #btnUndo, #top-toolbar #btnRedo { display: none; }
+    #btnRotateLeft, #btnRotateRight { display: none; }
     #workspace { position: relative; }
     #tool-sidebar { width: 58px; padding: 9px 5px; }
     .tool-btn { width: 47px; height: 47px; }

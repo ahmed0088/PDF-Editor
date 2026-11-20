@@ -10,7 +10,9 @@ const state = {
     history: [],
     historyIndex: -1,
     imageBuffer: null, // Temporary storage for images
-    renderVersion: 0
+    renderVersion: 0,
+    currentPage: 1,
+    pageRotations: new Map()
 };
 
 // DOM Elements
@@ -22,8 +24,11 @@ const btnUndo = document.getElementById('btnUndo');
 const btnRedo = document.getElementById('btnRedo');
 const btnSave = document.getElementById('btnSave');
 const btnDelete = document.getElementById('btnDelete');
+const btnClearPage = document.getElementById('btnClearPage');
 const zoomLevelText = document.getElementById('zoomLevel');
 const toolBtns = document.querySelectorAll('.tool-btn[data-tool]');
+const pageNumber = document.getElementById('pageNumber');
+const pageCount = document.getElementById('pageCount');
 const statusText = document.getElementById('statusText');
 const selectionStatus = document.getElementById('selectionStatus');
 const loaderText = document.getElementById('loaderText');
@@ -36,6 +41,25 @@ const propertyInputs = {
 
 function setStatus(message) {
     if (statusText) statusText.textContent = message;
+}
+
+function updatePageControls() {
+    const total = state.pdfDoc?.numPages || 0;
+    pageCount.textContent = total;
+    pageNumber.max = total || 1;
+    pageNumber.value = total ? state.currentPage : 1;
+    btnClearPage.disabled = !total;
+    document.getElementById('btnPrevPage').disabled = !total || state.currentPage <= 1;
+    document.getElementById('btnNextPage').disabled = !total || state.currentPage >= total;
+}
+
+function goToPage(page) {
+    if (!state.pdfDoc) return;
+    state.currentPage = Math.max(1, Math.min(state.pdfDoc.numPages, Number(page) || 1));
+    const wrapper = document.querySelector(`.page-wrapper[data-page-num="${state.currentPage}"]`);
+    if (wrapper) wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    updatePageControls();
+    setStatus(`Page ${state.currentPage} of ${state.pdfDoc.numPages}`);
 }
 
 function setSelection(element) {
@@ -78,6 +102,7 @@ Object.entries(propertyInputs).forEach(([name, input]) => {
 
 // --- Initialization ---
 function init() {
+    updatePageControls();
     updateToolUI();
 }
 
@@ -97,9 +122,12 @@ fileInput.addEventListener('change', async (e) => {
         state.elements.clear();
         state.history = [];
         state.historyIndex = -1;
+        state.currentPage = 1;
+        state.pageRotations.clear();
         saveHistory();
         btnSave.disabled = false;
         viewer.classList.remove('empty-state');
+        updatePageControls();
         setStatus(`${file.name} loaded · ${state.pdfDoc.numPages} page${state.pdfDoc.numPages === 1 ? '' : 's'}`);
         await renderPages();
 
@@ -142,6 +170,10 @@ async function renderPages() {
         pageEls.forEach(elData => createDOMElement(elData, wrapper, i, viewport));
 
         viewer.appendChild(wrapper);
+        wrapper.addEventListener('click', () => {
+            state.currentPage = i;
+            updatePageControls();
+        });
         setupOverlayEvents(overlay, i, viewport);
         if (renderVersion !== state.renderVersion) return;
     }
@@ -158,7 +190,7 @@ function updateToolUI() {
     document.querySelectorAll('.overlay-layer').forEach(overlay => {
         overlay.className = `overlay-layer mode-${state.tool}`;
     });
-    const names = { select: 'Select and move', text: 'Click anywhere to type', whiteout: 'Drag to cover content', highlight: 'Drag to highlight', draw: 'Draw or sign' };
+    const names = { select: 'Select and move', text: 'Click anywhere to type', whiteout: 'Drag to cover content', highlight: 'Drag to highlight', rectangle: 'Drag to add a rectangle', draw: 'Draw or sign' };
     setStatus(state.pdfDoc ? names[state.tool] : 'Ready — open a PDF to begin');
 }
 
@@ -180,6 +212,8 @@ function setupOverlayEvents(overlay, pageNum, viewport) {
     overlay.addEventListener('pointerdown', (e) => {
         if (e.target !== overlay) return; // Ignore clicks on elements
 
+        if (overlay.setPointerCapture) overlay.setPointerCapture(e.pointerId);
+
         setSelection(null);
 
         const rect = overlay.getBoundingClientRect();
@@ -188,7 +222,7 @@ function setupOverlayEvents(overlay, pageNum, viewport) {
 
         if (state.tool === 'text') {
             createTextElement(x, y, pageNum, viewport, overlay.parentElement);
-        } else if (state.tool === 'whiteout' || state.tool === 'highlight') {
+        } else if (state.tool === 'whiteout' || state.tool === 'highlight' || state.tool === 'rectangle') {
             isDrawing = true;
             startX = x; startY = y;
             tempEl = document.createElement('div');
@@ -197,7 +231,9 @@ function setupOverlayEvents(overlay, pageNum, viewport) {
             tempEl.style.top = y + 'px';
             tempEl.style.width = '0px';
             tempEl.style.height = '0px';
-            tempEl.style.background = state.tool === 'whiteout' ? '#ffffff' : 'rgba(255, 235, 59, 0.4)';
+            tempEl.style.pointerEvents = 'none';
+            tempEl.style.background = state.tool === 'whiteout' ? '#ffffff' : state.tool === 'highlight' ? '#ffeb3b' : document.getElementById('shapeColor').value;
+            tempEl.style.opacity = state.tool === 'whiteout' ? 1 : state.tool === 'highlight' ? 0.4 : document.getElementById('opacity').value;
             overlay.parentElement.appendChild(tempEl);
         } else if (state.tool === 'draw') {
             isDrawing = true;
@@ -215,13 +251,13 @@ function setupOverlayEvents(overlay, pageNum, viewport) {
         }
     });
 
-    overlay.addEventListener('pointermove', (e) => {
+    window.addEventListener('pointermove', (e) => {
         if (!isDrawing) return;
         const rect = overlay.getBoundingClientRect();
         let x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
         let y = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
 
-        if (state.tool === 'whiteout' || state.tool === 'highlight') {
+        if (state.tool === 'whiteout' || state.tool === 'highlight' || state.tool === 'rectangle') {
             const w = Math.abs(x - startX);
             const h = Math.abs(y - startY);
             tempEl.style.width = w + 'px';
@@ -235,11 +271,11 @@ function setupOverlayEvents(overlay, pageNum, viewport) {
         }
     });
 
-    overlay.addEventListener('pointerup', () => {
+    window.addEventListener('pointerup', () => {
         if (!isDrawing) return;
         isDrawing = false;
 
-        if ((state.tool === 'whiteout' || state.tool === 'highlight') && tempEl) {
+        if ((state.tool === 'whiteout' || state.tool === 'highlight' || state.tool === 'rectangle') && tempEl) {
             const w = parseFloat(tempEl.style.width);
             const h = parseFloat(tempEl.style.height);
 
@@ -255,8 +291,8 @@ function setupOverlayEvents(overlay, pageNum, viewport) {
                     y: (viewport.height - pxTop - h) / scale,
                     w: w / scale,
                     h: h / scale,
-                    color: state.tool === 'whiteout' ? '#ffffff' : '#ffeb3b',
-                    opacity: state.tool === 'whiteout' ? 1 : 0.4
+                    color: state.tool === 'whiteout' ? '#ffffff' : state.tool === 'highlight' ? '#ffeb3b' : document.getElementById('shapeColor').value,
+                    opacity: state.tool === 'whiteout' ? 1 : state.tool === 'highlight' ? 0.4 : Number(document.getElementById('opacity').value)
                 };
                 saveState(newElData, pageNum, overlay.parentElement, viewport);
             } else {
@@ -450,7 +486,6 @@ function createDOMElement(elData, container, pageNum, viewport) {
 
     // Setup Element Drag/Select
     div.addEventListener('pointerdown', (e) => {
-        if (state.tool !== 'select') return;
         e.stopPropagation();
 
         setSelection(div);
@@ -567,8 +602,8 @@ function saveHistory() {
     if (state.historyIndex < state.history.length - 1) {
         state.history = state.history.slice(0, state.historyIndex + 1);
     }
-    const snapshot = new Map();
-    state.elements.forEach((val, key) => snapshot.set(key, JSON.parse(JSON.stringify(val))));
+    const snapshot = { elements: new Map(), rotations: new Map(state.pageRotations) };
+    state.elements.forEach((val, key) => snapshot.elements.set(key, JSON.parse(JSON.stringify(val))));
     state.history.push(snapshot);
     state.historyIndex++;
 
@@ -578,8 +613,10 @@ function saveHistory() {
 function undo() {
     if (state.historyIndex > 0) {
         state.historyIndex--;
+        const snapshot = state.history[state.historyIndex];
         state.elements = new Map();
-        state.history[state.historyIndex].forEach((val, key) => state.elements.set(key, JSON.parse(JSON.stringify(val))));
+        snapshot.elements.forEach((val, key) => state.elements.set(key, JSON.parse(JSON.stringify(val))));
+        state.pageRotations = new Map(snapshot.rotations);
         renderPages();
         updateUndoRedoButtons();
         setStatus('Undo complete');
@@ -589,8 +626,10 @@ function undo() {
 function redo() {
     if (state.historyIndex < state.history.length - 1) {
         state.historyIndex++;
+        const snapshot = state.history[state.historyIndex];
         state.elements = new Map();
-        state.history[state.historyIndex].forEach((val, key) => state.elements.set(key, JSON.parse(JSON.stringify(val))));
+        snapshot.elements.forEach((val, key) => state.elements.set(key, JSON.parse(JSON.stringify(val))));
+        state.pageRotations = new Map(snapshot.rotations);
         renderPages();
         updateUndoRedoButtons();
         setStatus('Redo complete');
@@ -650,6 +689,36 @@ imageInput.addEventListener('change', (e) => {
 // --- Buttons & Shortcuts ---
 btnUndo.addEventListener('click', undo);
 btnRedo.addEventListener('click', redo);
+document.getElementById('btnPrevPage').addEventListener('click', () => goToPage(state.currentPage - 1));
+document.getElementById('btnNextPage').addEventListener('click', () => goToPage(state.currentPage + 1));
+pageNumber.addEventListener('change', () => goToPage(pageNumber.value));
+document.getElementById('btnFitWidth').addEventListener('click', () => {
+    if (!state.pdfDoc) return;
+    const first = document.querySelector('.page-wrapper');
+    const viewerWidth = document.getElementById('viewer-container').clientWidth - 80;
+    if (!first || viewerWidth < 200) return;
+    state.scale = Math.max(0.5, Math.min(3, state.scale * (viewerWidth / first.clientWidth)));
+    zoomLevelText.textContent = Math.round(state.scale * 100) + '%';
+    setStatus('Fit to workspace');
+    renderPages();
+});
+function rotateCurrentPage(amount) {
+    if (!state.pdfDoc) return;
+    const current = state.pageRotations.get(state.currentPage) || 0;
+    state.pageRotations.set(state.currentPage, (current + amount + 360) % 360);
+    saveHistory();
+    setStatus(`Page ${state.currentPage} rotation set to ${state.pageRotations.get(state.currentPage)}° · applied on export`);
+}
+document.getElementById('btnRotateLeft').addEventListener('click', () => rotateCurrentPage(-90));
+document.getElementById('btnRotateRight').addEventListener('click', () => rotateCurrentPage(90));
+btnClearPage.addEventListener('click', () => {
+    if (!state.pdfDoc) return;
+    state.elements.delete(state.currentPage);
+    setSelection(null);
+    saveHistory();
+    renderPages();
+    setStatus(`Cleared edits from page ${state.currentPage}`);
+});
 btnDelete.addEventListener('click', () => {
     if (!state.selectedEl) return;
     const selected = state.selectedEl;
@@ -672,7 +741,7 @@ window.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redo(); }
     if (e.key === 'Delete' || e.key === 'Backspace') { if (state.selectedEl) btnDelete.click(); }
     if (e.key === 'Escape') setSelection(null);
-    const shortcuts = { v: 'select', t: 'text', r: 'whiteout', h: 'highlight', d: 'draw' };
+    const shortcuts = { v: 'select', t: 'text', r: 'whiteout', h: 'highlight', b: 'rectangle', d: 'draw' };
     const tool = shortcuts[e.key.toLowerCase()];
     if (tool) { state.tool = tool; updateToolUI(); }
 });
@@ -692,13 +761,15 @@ btnSave.addEventListener('click', async () => {
     loaderText.textContent = 'Building your edited PDF…';
 
     try {
-        const { PDFDocument, rgb, StandardFonts } = PDFLib;
+        const { PDFDocument, rgb, StandardFonts, degrees } = PDFLib;
         const pdfDoc = await PDFDocument.load(state.originalBytes);
         const pages = pdfDoc.getPages();
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
         for (let i = 1; i <= pages.length; i++) {
             const page = pages[i - 1];
+            const rotation = state.pageRotations.get(i);
+            if (rotation !== undefined) page.setRotation(degrees(rotation));
             const els = state.elements.get(i) || [];
 
             for (const el of els) {

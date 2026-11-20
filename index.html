@@ -24,6 +24,17 @@
         <button id="btnUndo" class="btn" title="Undo (Ctrl/Cmd + Z)">Undo</button>
         <button id="btnRedo" class="btn" title="Redo (Ctrl/Cmd + Shift + Z)">Redo</button>
 
+        <div class="page-controls" aria-label="Page controls">
+            <button id="btnPrevPage" class="btn icon" title="Previous page">‹</button>
+            <input id="pageNumber" type="number" value="1" min="1" aria-label="Current page">
+            <span>/ <strong id="pageCount">0</strong></span>
+            <button id="btnNextPage" class="btn icon" title="Next page">›</button>
+        </div>
+
+        <button id="btnFitWidth" class="btn" title="Fit page to workspace">Fit</button>
+        <button id="btnRotateLeft" class="btn icon" title="Rotate current page left">↺</button>
+        <button id="btnRotateRight" class="btn icon" title="Rotate current page right">↻</button>
+
         <div class="spacer"></div>
 
         <div class="zoom-controls">
@@ -43,6 +54,7 @@
             <button class="tool-btn" data-tool="text" title="Add text (T)"><span>T</span><small>Text</small></button>
             <button class="tool-btn" data-tool="whiteout" title="Whiteout / redact (R)"><span>□</span><small>Cover</small></button>
             <button class="tool-btn" data-tool="highlight" title="Highlight (H)"><span>▰</span><small>Mark</small></button>
+            <button class="tool-btn" data-tool="rectangle" title="Add rectangle (B)"><span>▭</span><small>Shape</small></button>
             <button class="tool-btn" data-tool="draw" title="Draw / sign (D)"><span>✎</span><small>Draw</small></button>
             <label class="tool-btn" for="imageInput" title="Insert image"><span>▧</span><small>Image</small></label>
             <input type="file" id="imageInput" accept="image/png, image/jpeg" style="display:none;">
@@ -87,10 +99,11 @@
             </div>
 
             <button id="btnDelete" class="btn danger full-width" disabled>Delete selected</button>
+            <button id="btnClearPage" class="btn" disabled>Clear current page</button>
         </aside>
     </main>
 
-    <footer id="statusbar"><span id="statusText">Ready — open a PDF to begin</span><span class="shortcut-hint">V select · T text · R cover · H highlight · D draw · Delete remove</span></footer>
+    <footer id="statusbar"><span id="statusText">Ready — open a PDF to begin</span><span class="shortcut-hint">V select · T text · R cover · H highlight · B shape · D draw · Delete remove</span></footer>
 
     <!-- Loader -->
     <div id="loader" class="hidden">
