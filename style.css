@@ -514,3 +514,9 @@ button, label { user-select: none; }
     .toolbar-document { gap: 4px; padding-inline: 8px; }
     #top-toolbar .toolbar-document .btn { gap: 4px; padding-inline: 6px; font-size: .72rem; }
 }
+
+#btnRestart:disabled { opacity: .55; cursor: wait; }
+@media (max-width: 420px) {
+    #statusbar { flex-wrap: wrap; gap: 0 10px; }
+    #statusText { flex-basis: 100%; padding-top: 4px; }
+}

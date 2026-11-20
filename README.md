@@ -53,3 +53,5 @@ Open **Sign** to type your name or draw with a mouse, finger, or stylus. Choose 
 On phones, **Undo** and **Redo** sit between **Open PDF** and **Save PDF**. They restore the edit history while keeping the current scroll position. Use **Done** on the phone keyboard to finish entering text.
 
 The phone toolbar keeps Open, Undo, Redo and Save at the top. Use **More** for zoom, rotation, Properties, Versions, Pages and Auto-organize. The PDF libraries are served with the editor and cached for offline use.
+
+**Check & restart** checks for a fresh app build before reloading. It asks before closing an open PDF and leaves the session open if the update check fails.

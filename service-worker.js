@@ -1,5 +1,5 @@
 const prefix = 'pro-pdf-editor-';
-const cacheName = prefix + '2026-11-20-8';
+const cacheName = prefix + '2026-11-20-9';
 const shell = [
     './', './index.html', './style.css', './app.js', './organizer.js', './document-tools.js',
     './versions.js', './install.js', './fonts.js', './signature.js', './allura-latin.woff2', './manifest.webmanifest', './favicon.svg', './icon-192.png', './icon-512.png',
@@ -8,7 +8,7 @@ const shell = [
 const cachedAssets = new Set(shell);
 
 self.addEventListener('install', event => {
-    event.waitUntil(caches.open(cacheName).then(cache => cache.addAll(shell)).then(() => self.skipWaiting()));
+    event.waitUntil(caches.open(cacheName).then(cache => cache.addAll(shell.map(url => new Request(url, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', event => {
     event.waitUntil(caches.keys().then(keys => Promise.all(
