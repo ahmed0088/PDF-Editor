@@ -170,7 +170,10 @@ async function openPDF(file) {
         state.originalBytes = bytes;
         state.fileName = file.name;
         state.pdfDoc = documentToOpen;
-        if (state.tool === 'signature') state.tool = 'select';
+        if (state.tool === 'signature') {
+            state.tool = 'select';
+            updateToolUI();
+        }
         state.elements.clear();
         state.pageViewports.clear();
         state.history = [];
@@ -251,8 +254,14 @@ async function renderPages() {
             updatePageControls();
         });
         setupOverlayEvents(overlay, i, viewport);
+        let signatureTapStarted = false;
+        overlay.addEventListener('pointerdown', event => {
+            signatureTapStarted = state.tool === 'signature' && event.isPrimary && event.button === 0;
+        });
+        overlay.addEventListener('pointercancel', () => { signatureTapStarted = false; });
         overlay.addEventListener('click', event => {
-            if (state.tool === 'signature') placeSignature(event, wrapper);
+            if (state.tool === 'signature' && signatureTapStarted) placeSignature(event, wrapper);
+            signatureTapStarted = false;
         });
         setupAreaSelection(wrapper, overlay);
         if (state.tool === "replace") addSourceTextTargets(wrapper);

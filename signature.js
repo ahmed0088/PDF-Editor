@@ -100,9 +100,23 @@ function cropSignatureDrawing() {
     return { bytes: image.toDataURL('image/png'), width: image.width, height: image.height };
 }
 
+let signaturePlaceTouch;
+signaturePlace.addEventListener('pointerdown', event => {
+    if (event.pointerType === 'touch') signaturePlaceTouch = event;
+});
+signaturePlace.addEventListener('pointercancel', () => { signaturePlaceTouch = null; });
+signaturePlace.addEventListener('pointerup', event => {
+    const start = signaturePlaceTouch;
+    signaturePlaceTouch = null;
+    if (start?.pointerId === event.pointerId &&
+        Math.hypot(event.clientX - start.clientX, event.clientY - start.clientY) < 8) {
+        signatureForm.requestSubmit(signaturePlace);
+    }
+});
+
 signatureForm.addEventListener('submit', async event => {
     event.preventDefault();
-    if (signaturePlace.disabled || !state.pdfDoc) return;
+    if (signaturePlace.disabled || !signatureDialog.open || !state.pdfDoc) return;
     const pdf = state.pdfDoc;
     const typed = signatureForm.elements.signatureMode.value === 'type';
     const text = signatureName.value.trim();
