@@ -24,6 +24,57 @@ const btnSave = document.getElementById('btnSave');
 const btnDelete = document.getElementById('btnDelete');
 const zoomLevelText = document.getElementById('zoomLevel');
 const toolBtns = document.querySelectorAll('.tool-btn[data-tool]');
+const statusText = document.getElementById('statusText');
+const selectionStatus = document.getElementById('selectionStatus');
+const loaderText = document.getElementById('loaderText');
+const propertyInputs = {
+    fontSize: document.getElementById('fontSize'),
+    textColor: document.getElementById('textColor'),
+    shapeColor: document.getElementById('shapeColor'),
+    opacity: document.getElementById('opacity')
+};
+
+function setStatus(message) {
+    if (statusText) statusText.textContent = message;
+}
+
+function setSelection(element) {
+    document.querySelectorAll('.editor-element').forEach(el => el.classList.remove('selected'));
+    state.selectedEl = element || null;
+    if (element) {
+        element.classList.add('selected');
+        btnDelete.disabled = false;
+        if (selectionStatus) selectionStatus.textContent = `${element.elData.type} selected`;
+        if (element.elData.type === 'text') {
+            propertyInputs.fontSize.value = element.elData.size || 12;
+            propertyInputs.textColor.value = element.elData.color || '#000000';
+        }
+        if (element.elData.type === 'shape') {
+            propertyInputs.shapeColor.value = element.elData.color || '#ffffff';
+            propertyInputs.opacity.value = element.elData.opacity ?? 1;
+        }
+    } else {
+        btnDelete.disabled = true;
+        if (selectionStatus) selectionStatus.textContent = 'Nothing selected';
+    }
+}
+
+function updateSelectedProperty(name, value) {
+    const selected = state.selectedEl;
+    if (!selected || !selected.stateData) return;
+    const data = selected.stateData;
+    if (name === 'fontSize' && data.type === 'text') data.size = Math.max(6, Math.min(72, Number(value) || 12));
+    if (name === 'textColor' && data.type === 'text') data.color = value;
+    if (name === 'shapeColor' && data.type === 'shape') data.color = value;
+    if (name === 'opacity' && data.type === 'shape') data.opacity = Number(value);
+    saveHistory();
+    renderPages();
+    setStatus('Property updated');
+}
+
+Object.entries(propertyInputs).forEach(([name, input]) => {
+    if (input) input.addEventListener('change', () => updateSelectedProperty(name, input.value));
+});
 
 // --- Initialization ---
 function init() {
@@ -36,23 +87,25 @@ fileInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     loader.classList.remove('hidden');
-    
+
     try {
         const buffer = await file.arrayBuffer();
         state.originalBytes = buffer.slice(0);
-        
+
         const loadingTask = pdfjsLib.getDocument({ data: buffer });
         state.pdfDoc = await loadingTask.promise;
-        
+
         state.elements.clear();
         state.history = [];
         state.historyIndex = -1;
         saveHistory();
         btnSave.disabled = false;
         viewer.classList.remove('empty-state');
+        setStatus(`${file.name} loaded · ${state.pdfDoc.numPages} page${state.pdfDoc.numPages === 1 ? '' : 's'}`);
         await renderPages();
-        
+
     } catch (err) {
+        setStatus('Could not open that PDF');
         alert("Error loading PDF: " + err.message);
     } finally {
         loader.classList.add('hidden');
@@ -93,7 +146,7 @@ async function renderPages() {
         setupOverlayEvents(overlay, i, viewport);
         if (renderVersion !== state.renderVersion) return;
     }
-    
+
     // Setup Global Drag for this render cycle
     setupGlobalDrag();
 }
@@ -106,14 +159,14 @@ function updateToolUI() {
     document.querySelectorAll('.overlay-layer').forEach(overlay => {
         overlay.className = `overlay-layer mode-${state.tool}`;
     });
+    const names = { select: 'Select and move', text: 'Click anywhere to type', whiteout: 'Drag to cover content', highlight: 'Drag to highlight', draw: 'Draw or sign' };
+    setStatus(state.pdfDoc ? names[state.tool] : 'Ready — open a PDF to begin');
 }
 
 toolBtns.forEach(btn => {
     btn.addEventListener('click', () => {
         state.tool = btn.dataset.tool;
-        state.selectedEl = null;
-        btnDelete.disabled = true;
-        document.querySelectorAll('.editor-element').forEach(el => el.classList.remove('selected'));
+        setSelection(null);
         updateToolUI();
     });
 });
@@ -127,10 +180,8 @@ function setupOverlayEvents(overlay, pageNum, viewport) {
     // Click to deselect
     overlay.addEventListener('pointerdown', (e) => {
         if (e.target !== overlay) return; // Ignore clicks on elements
-        
-        document.querySelectorAll('.editor-element').forEach(el => el.classList.remove('selected'));
-        state.selectedEl = null;
-        btnDelete.disabled = true;
+
+        setSelection(null);
 
         const rect = overlay.getBoundingClientRect();
         const x = e.clientX - rect.left;
@@ -153,7 +204,7 @@ function setupOverlayEvents(overlay, pageNum, viewport) {
             isDrawing = true;
             startX = x; startY = y;
             currentPath = [{x, y}];
-            
+
             // Create SVG for real-time drawing
             svgCanvas = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             svgCanvas.style.position = 'absolute';
@@ -192,7 +243,7 @@ function setupOverlayEvents(overlay, pageNum, viewport) {
         if ((state.tool === 'whiteout' || state.tool === 'highlight') && tempEl) {
             const w = parseFloat(tempEl.style.width);
             const h = parseFloat(tempEl.style.height);
-            
+
             if (w > 5 && h > 5) {
                 const pxLeft = parseFloat(tempEl.style.left);
                 const pxTop = parseFloat(tempEl.style.top);
@@ -218,14 +269,14 @@ function setupOverlayEvents(overlay, pageNum, viewport) {
                 // Save draw path
                 const scale = state.scale;
                 const pdfPath = currentPath.map(p => ({ x: p.x / scale, y: (viewport.height - p.y) / scale }));
-                
+
                 const newElData = {
                     type: 'draw',
                     path: pdfPath,
                     color: document.getElementById('penColor').value,
                     thickness: parseInt(document.getElementById('penSize').value)
                 };
-                
+
                 // Keep the SVG visually but convert to state
                 saveState(newElData, pageNum, overlay.parentElement, viewport);
                 svgCanvas.remove(); // Remove temp SVG, recreate via DOM element based on state
@@ -241,24 +292,33 @@ function setupOverlayEvents(overlay, pageNum, viewport) {
 function createTextElement(x, y, pageNum, viewport, container) {
     const scale = state.scale;
     const size = parseInt(document.getElementById('fontSize').value) || 12;
-    
+
     // Create HTML input temporarily
     const input = document.createElement('input');
     input.type = 'text';
+    input.setAttribute('aria-label', 'Text to add to the PDF');
+    input.placeholder = 'Type here…';
     input.style.position = 'absolute';
     input.style.left = x + 'px';
     input.style.top = y + 'px';
     input.style.fontSize = (size * scale) + 'px';
     input.style.fontFamily = 'Arial, sans-serif';
     input.style.border = '2px solid #3b82f6';
-    input.style.background = 'white';
+    input.style.borderRadius = '5px';
+    input.style.background = '#ffffff';
+    input.style.color = '#111827';
+    input.style.padding = '4px 7px';
+    input.style.minWidth = '150px';
     input.style.zIndex = '100';
     input.style.outline = 'none';
-    
-    container.appendChild(input);
-    input.focus();
 
+    container.appendChild(input);
+    requestAnimationFrame(() => { input.focus(); input.select(); });
+
+    let finished = false;
     const finalizeText = () => {
+        if (finished) return;
+        finished = true;
         const text = input.value.trim();
         if (text) {
             const newElData = {
@@ -270,15 +330,59 @@ function createTextElement(x, y, pageNum, viewport, container) {
                 color: document.getElementById('textColor').value
             };
             saveState(newElData, pageNum, container, viewport);
+            setStatus('Text added — choose Select to move it or double-click to edit');
+        } else {
+            setStatus('Text entry cancelled');
         }
         input.remove();
     };
+    const cancelText = () => {
+        if (finished) return;
+        finished = true;
+        input.remove();
+        setStatus('Text entry cancelled');
+    };
 
-    input.addEventListener('blur', finalizeText);
+    input.addEventListener('blur', finalizeText, { once: true });
     input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') finalizeText();
-        if (e.key === 'Escape') input.remove();
+        if (e.key === 'Enter') { e.preventDefault(); finalizeText(); }
+        if (e.key === 'Escape') { e.preventDefault(); cancelText(); }
     });
+}
+
+function editTextElement(element) {
+    const data = element.stateData;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = data.text;
+    input.setAttribute('aria-label', 'Edit PDF text');
+    input.className = 'inline-text-editor';
+    input.style.left = element.style.left;
+    input.style.top = element.style.top;
+    input.style.fontSize = element.style.fontSize;
+    input.style.color = data.color || '#000000';
+    input.style.width = `${Math.max(element.offsetWidth + 32, 150)}px`;
+    element.parentElement.appendChild(input);
+    element.style.visibility = 'hidden';
+    let finished = false;
+    const finish = (cancelled = false) => {
+        if (finished) return;
+        finished = true;
+        if (!cancelled && input.value.trim()) {
+            const next = { ...data, text: input.value.trim() };
+            updateStateData(next, Number(element.dataset.page), data);
+            saveHistory();
+            setStatus('Text updated');
+        }
+        input.remove();
+        renderPages();
+    };
+    input.addEventListener('blur', () => finish());
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); finish(); }
+        if (e.key === 'Escape') { e.preventDefault(); finish(true); }
+    });
+    requestAnimationFrame(() => { input.focus(); input.select(); });
 }
 
 function createDOMElement(elData, container, pageNum, viewport) {
@@ -286,7 +390,7 @@ function createDOMElement(elData, container, pageNum, viewport) {
     const div = document.createElement('div');
     div.className = 'editor-element';
     div.dataset.page = pageNum;
-    
+
     if (elData.type === 'text') {
         div.classList.add('el-text');
         div.textContent = elData.text;
@@ -294,7 +398,7 @@ function createDOMElement(elData, container, pageNum, viewport) {
         div.style.top = (viewport.height - (elData.y * scale) - (elData.size * scale)) + 'px';
         div.style.fontSize = (elData.size * scale) + 'px';
         div.style.color = elData.color || '#000000';
-    } 
+    }
     else if (elData.type === 'shape') {
         div.classList.add('el-shape');
         div.style.left = (elData.x * scale) + 'px';
@@ -344,16 +448,13 @@ function createDOMElement(elData, container, pageNum, viewport) {
     // Store data object on the element for easy retrieval
     div.elData = JSON.parse(JSON.stringify(elData));
     div.stateData = elData;
-    
+
     // Setup Element Drag/Select
     div.addEventListener('pointerdown', (e) => {
         if (state.tool !== 'select') return;
         e.stopPropagation();
-        
-        document.querySelectorAll('.editor-element').forEach(el => el.classList.remove('selected'));
-        div.classList.add('selected');
-        state.selectedEl = div;
-        btnDelete.disabled = false;
+
+        setSelection(div);
 
         // Determine if resizing (bottom right corner)
         const rect = div.getBoundingClientRect();
@@ -361,6 +462,13 @@ function createDOMElement(elData, container, pageNum, viewport) {
 
         startElementDrag(e, div, isResize, viewport, pageNum);
     });
+
+    if (elData.type === 'text') {
+        div.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            editTextElement(div);
+        });
+    }
 
     container.appendChild(div);
     return div;
@@ -378,7 +486,7 @@ function startElementDrag(e, el, isResize, viewport, pageNum) {
     dragType = isResize ? 'resize' : 'move';
     dragStartX = e.clientX;
     dragStartY = e.clientY;
-    
+
     elStartX = parseFloat(el.style.left);
     elStartY = parseFloat(el.style.top);
     elStartW = parseFloat(el.style.width) || 0;
@@ -406,16 +514,16 @@ function setupGlobalDrag() {
 
     window.addEventListener('pointerup', () => {
         if (!dragTarget) return;
-        
+
         const container = dragTarget.parentElement;
         const pageNum = parseInt(container.dataset.pageNum);
         const scale = state.scale;
         const viewportHeight = container.clientHeight;
 
         let newData = JSON.parse(JSON.stringify(dragTarget.elData));
-        
+
         newData.x = parseFloat(dragTarget.style.left) / scale;
-        
+
         if (newData.type === 'text') {
             newData.y = (viewportHeight - parseFloat(dragTarget.style.top)) / scale - newData.size;
         } else {
@@ -430,7 +538,7 @@ function setupGlobalDrag() {
         updateStateData(newData, pageNum, previousStateData);
         dragTarget.elData = newData;
         dragTarget.stateData = newData;
-        
+
         saveHistory();
         dragTarget = null;
     });
@@ -441,7 +549,7 @@ function saveState(newElData, pageNum, container, viewport) {
     const pageEls = state.elements.get(pageNum) || [];
     pageEls.push(newElData);
     state.elements.set(pageNum, pageEls);
-    
+
     saveHistory();
     renderPages(); // Re-render to show the finalized element
 }
@@ -464,7 +572,7 @@ function saveHistory() {
     state.elements.forEach((val, key) => snapshot.set(key, JSON.parse(JSON.stringify(val))));
     state.history.push(snapshot);
     state.historyIndex++;
-    
+
     updateUndoRedoButtons();
 }
 
@@ -475,6 +583,7 @@ function undo() {
         state.history[state.historyIndex].forEach((val, key) => state.elements.set(key, JSON.parse(JSON.stringify(val))));
         renderPages();
         updateUndoRedoButtons();
+        setStatus('Undo complete');
     }
 }
 
@@ -485,6 +594,7 @@ function redo() {
         state.history[state.historyIndex].forEach((val, key) => state.elements.set(key, JSON.parse(JSON.stringify(val))));
         renderPages();
         updateUndoRedoButtons();
+        setStatus('Redo complete');
     }
 }
 
@@ -497,7 +607,7 @@ function updateUndoRedoButtons() {
 imageInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
+
     const reader = new FileReader();
     reader.onload = (event) => {
         const img = new Image();
@@ -506,17 +616,17 @@ imageInput.addEventListener('change', (e) => {
             if (state.pdfDoc && state.pdfDoc.numPages > 0) {
                 const wrapper = document.querySelector('.page-wrapper[data-page-num="1"]');
                 if (!wrapper) return;
-                
+
                 const scale = state.scale;
                 const pdfWidth = wrapper.clientWidth / scale;
                 const pdfHeight = wrapper.clientHeight / scale;
-                
+
                 // Scale image down to max 20% of page size
                 const maxW = pdfWidth * 0.2;
                 const maxH = pdfHeight * 0.2;
                 let w = img.width / scale;
                 let h = img.height / scale;
-                
+
                 if (w > maxW) { h *= maxW / w; w = maxW; }
                 if (h > maxH) { w *= maxH / h; h = maxH; }
 
@@ -528,7 +638,7 @@ imageInput.addEventListener('change', (e) => {
                     w: w,
                     h: h
                 };
-                
+
                 saveState(newElData, 1, wrapper, { height: wrapper.clientHeight });
             }
         };
@@ -551,32 +661,37 @@ btnDelete.addEventListener('click', () => {
     const pageEls = state.elements.get(pageNum) || [];
     const idx = pageEls.indexOf(selected.stateData);
     if (idx !== -1) pageEls.splice(idx, 1);
-    
-    state.selectedEl = null;
-    btnDelete.disabled = true;
+
+    setSelection(null);
     saveHistory();
+    setStatus('Element deleted');
 });
 
 window.addEventListener('keydown', (e) => {
-    if (e.target.tagName === 'INPUT') return;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
     if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redo(); }
     if (e.key === 'Delete' || e.key === 'Backspace') { if (state.selectedEl) btnDelete.click(); }
+    if (e.key === 'Escape') setSelection(null);
+    const shortcuts = { v: 'select', t: 'text', r: 'whiteout', h: 'highlight', d: 'draw' };
+    const tool = shortcuts[e.key.toLowerCase()];
+    if (tool) { state.tool = tool; updateToolUI(); }
 });
 
 // Zoom
 document.getElementById('btnZoomIn').addEventListener('click', () => {
-    if (state.scale < 3) { state.scale += 0.25; zoomLevelText.textContent = Math.round(state.scale * 100) + '%'; renderPages(); }
+    if (state.scale < 3) { state.scale += 0.25; zoomLevelText.textContent = Math.round(state.scale * 100) + '%'; setStatus(`Zoom ${zoomLevelText.textContent}`); renderPages(); }
 });
 document.getElementById('btnZoomOut').addEventListener('click', () => {
-    if (state.scale > 0.5) { state.scale -= 0.25; zoomLevelText.textContent = Math.round(state.scale * 100) + '%'; renderPages(); }
+    if (state.scale > 0.5) { state.scale -= 0.25; zoomLevelText.textContent = Math.round(state.scale * 100) + '%'; setStatus(`Zoom ${zoomLevelText.textContent}`); renderPages(); }
 });
 
 // --- Save PDF ---
 btnSave.addEventListener('click', async () => {
     if (!state.originalBytes) return;
     loader.classList.remove('hidden');
-    
+    loaderText.textContent = 'Building your edited PDF…';
+
     try {
         const { PDFDocument, rgb, StandardFonts } = PDFLib;
         const pdfDoc = await PDFDocument.load(state.originalBytes);
@@ -593,18 +708,18 @@ btnSave.addEventListener('click', async () => {
                     const r = parseInt(hex.substring(0, 2), 16) / 255;
                     const g = parseInt(hex.substring(2, 4), 16) / 255;
                     const b = parseInt(hex.substring(4, 6), 16) / 255;
-                    
+
                     page.drawRectangle({
                         x: el.x, y: el.y, width: el.w, height: el.h,
                         color: rgb(r, g, b), opacity: el.opacity, borderWidth: 0
                     });
-                } 
+                }
                 else if (el.type === 'text') {
                     const hex = el.color.replace('#', '');
                     const r = parseInt(hex.substring(0, 2), 16) / 255;
                     const g = parseInt(hex.substring(2, 4), 16) / 255;
                     const b = parseInt(hex.substring(4, 6), 16) / 255;
-                    
+
                     page.drawText(el.text, {
                         x: el.x, y: el.y, size: el.size, font: font, color: rgb(r, g, b)
                     });
@@ -615,7 +730,7 @@ btnSave.addEventListener('click', async () => {
                     const binStr = atob(b64Data);
                     const bytes = new Uint8Array(binStr.length);
                     for (let j = 0; j < binStr.length; j++) bytes[j] = binStr.charCodeAt(j);
-                    
+
                     let img;
                     if (el.src.includes('image/png')) {
                         img = await pdfDoc.embedPng(bytes);
@@ -645,14 +760,16 @@ btnSave.addEventListener('click', async () => {
         const finalBytes = await pdfDoc.save();
         const blob = new Blob([finalBytes], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
-        
+
         const a = document.createElement('a');
         a.href = url;
         a.download = 'Edited_Document.pdf';
         a.click();
         URL.revokeObjectURL(url);
+        setStatus('PDF downloaded successfully');
 
     } catch (err) {
+        setStatus('Could not save the PDF');
         alert("Error saving: " + err.message);
     } finally {
         loader.classList.add('hidden');
