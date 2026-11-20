@@ -204,7 +204,9 @@ function openReportRow(row) {
 
 addReportRow.addEventListener('click', () => openReportRow());
 document.getElementById('cancelReportRow').addEventListener('click', () => rowEditor.close());
-resetReportRow.addEventListener('click', () => { editorText.value = rowToEdit.original; });
+resetReportRow.addEventListener('click', () => {
+    if (rowToEdit?.original !== undefined) editorText.value = rowToEdit.original;
+});
 document.getElementById('reportRowForm').addEventListener('submit', event => {
     event.preventDefault();
     const text = editorText.value.trim();

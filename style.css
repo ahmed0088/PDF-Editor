@@ -291,6 +291,7 @@ button, label { user-select: none; }
 .report-status #organizerStatus { margin: 0; }
 .report-status .btn { flex: none; }
 .edit-report-row { margin-inline-start: 8px; }
+#resetReportRow[hidden] { display: none; }
 .compact-dialog textarea { width: 100%; resize: vertical; padding: 8px; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 7px; font: inherit; }
 @media (max-width: 620px) {
     #organizer th, #organizer td { padding: 7px 5px; }
