@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro PDF Editor | Web</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- PDF.js for rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- PDF-lib for saving -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+</head>
+<body>
+
+    <!-- Top Toolbar -->
+    <header id="top-toolbar">
+        <div class="brand">🛡️ Pro PDF Editor</div>
+        <label class="btn primary" for="fileInput">📂 Open PDF</label>
+        <input type="file" id="fileInput" accept="application/pdf">
+        
+        <div class="divider"></div>
+        
+        <button id="btnUndo" class="btn" title="Undo (Ctrl+Z)">↩️ Undo</button>
+        <button id="btnRedo" class="btn" title="Redo (Ctrl+Y)">↪️ Redo</button>
+        
+        <div class="spacer"></div>
+        
+        <div class="zoom-controls">
+            <button id="btnZoomOut" class="btn icon">➖</button>
+            <span id="zoomLevel">100%</span>
+            <button id="btnZoomIn" class="btn icon">➕</button>
+        </div>
+
+        <button id="btnSave" class="btn success" disabled>💾 Save PDF</button>
+    </header>
+
+    <!-- Main Workspace -->
+    <main id="workspace">
+        <!-- Left Sidebar: Tools -->
+        <aside id="tool-sidebar">
+            <button class="tool-btn active" data-tool="select" title="Select / Move">🖱️</button>
+            <button class="tool-btn" data-tool="text" title="Add Text">🔤</button>
+            <button class="tool-btn" data-tool="whiteout" title="Whiteout / Redact">⬜</button>
+            <button class="tool-btn" data-tool="highlight" title="Highlight">🖍️</button>
+            <button class="tool-btn" data-tool="draw" title="Draw / Sign">✒️</button>
+            <label class="tool-btn" for="imageInput" title="Insert Image">🖼️</label>
+            <input type="file" id="imageInput" accept="image/png, image/jpeg" style="display:none;">
+        </aside>
+
+        <!-- Center: PDF Viewer -->
+        <section id="viewer-container">
+            <div id="viewer" class="empty-state">
+                <h2>No Document Loaded</h2>
+                <p>Click "Open PDF" to begin editing.</p>
+            </div>
+        </section>
+
+        <!-- Right Sidebar: Properties -->
+        <aside id="properties-sidebar">
+            <h3>Properties</h3>
+            
+            <div class="prop-group" id="prop-text">
+                <label>Font Size</label>
+                <input type="number" id="fontSize" value="12" min="6" max="72">
+                
+                <label>Text Color</label>
+                <input type="color" id="textColor" value="#000000">
+            </div>
+
+            <div class="prop-group" id="prop-shape">
+                <label>Fill Color</label>
+                <input type="color" id="shapeColor" value="#ffffff">
+                
+                <label>Opacity</label>
+                <input type="range" id="opacity" min="0.1" max="1" step="0.1" value="1">
+            </div>
+
+            <div class="prop-group" id="prop-draw">
+                <label>Pen Color</label>
+                <input type="color" id="penColor" value="#000000">
+                
+                <label>Pen Thickness</label>
+                <input type="number" id="penSize" value="2" min="1" max="20">
+            </div>
+
+            <button id="btnDelete" class="btn danger full-width" disabled>🗑️ Delete Selected</button>
+        </aside>
+    </main>
+
+    <!-- Loader -->
+    <div id="loader" class="hidden">
+        <div class="spinner"></div>
+        <p>Processing...</p>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
