@@ -49,3 +49,5 @@ In **Auto-organize**, filter by page, use **Edit** to correct extracted rows, or
 Choose Helvetica, Times, or Courier, with regular, bold, and italic styles, in **Properties** or the replacement dialog. Available characters remain selectable in the exported PDF. Other characters use the image fallback.
 
 Open **Sign** to type your name or draw with a mouse, finger, or stylus. Choose **Place signature**, then click or tap the PDF. The signature is a movable, resizable visual mark and is included in the exported document.
+
+On phones, **Undo** and **Redo** sit between **Open PDF** and **Save PDF**. They restore the edit history while keeping the current scroll position. Use **Done** on the phone keyboard to finish entering text.

@@ -18,39 +18,40 @@
 
     <!-- Top Toolbar -->
     <header id="top-toolbar">
-        <div class="brand"><span class="brand-mark">✦</span><span>Pro PDF Editor</span></div>
-        <button class="btn primary" id="btnOpen">Open PDF</button>
-        <input type="file" id="fileInput" accept="application/pdf">
-
-        <div class="divider"></div>
-
-        <button id="btnUndo" class="btn" title="Undo (Ctrl/Cmd + Z)">Undo</button>
-        <button id="btnRedo" class="btn" title="Redo (Ctrl/Cmd + Shift + Z)">Redo</button>
-
-        <div class="page-controls" aria-label="Page controls">
-            <button id="btnPrevPage" class="btn icon" title="Previous page">‹</button>
-            <input id="pageNumber" type="number" value="1" min="1" aria-label="Current page">
-            <span>/ <strong id="pageCount">0</strong></span>
-            <button id="btnNextPage" class="btn icon" title="Next page">›</button>
+        <div class="toolbar-document">
+            <div class="brand"><span class="brand-mark" aria-hidden="true">✦</span><span>Pro PDF Editor</span></div>
+            <button class="btn primary" id="btnOpen">Open PDF</button>
+            <input type="file" id="fileInput" accept="application/pdf">
+            <div class="history-controls" aria-label="Edit history" role="group">
+                <button id="btnUndo" class="btn" title="Undo (Ctrl/Cmd + Z)" disabled><span aria-hidden="true">↶</span> Undo</button>
+                <button id="btnRedo" class="btn" title="Redo (Ctrl/Cmd + Shift + Z)" disabled><span aria-hidden="true">↷</span> Redo</button>
+            </div>
+            <button id="btnSave" class="btn success" disabled>Save PDF</button>
         </div>
-
-        <button id="btnFitWidth" class="btn" title="Fit page to workspace">Fit</button>
-        <button id="btnRotateLeft" class="btn icon" title="Rotate current page left">↺</button>
-        <button id="btnRotateRight" class="btn icon" title="Rotate current page right">↻</button>
-
-        <div class="spacer"></div>
-
-        <div class="zoom-controls">
-            <button id="btnZoomOut" class="btn icon" title="Zoom out">−</button>
-            <span id="zoomLevel">150%</span>
-            <button id="btnZoomIn" class="btn icon" title="Zoom in">+</button>
+        <div class="toolbar-view">
+            <div class="page-controls" aria-label="Page controls" role="group">
+                <button id="btnPrevPage" class="btn icon" aria-label="Previous page">‹</button>
+                <input id="pageNumber" type="number" value="1" min="1" aria-label="Current page">
+                <span>/ <strong id="pageCount">0</strong></span>
+                <button id="btnNextPage" class="btn icon" aria-label="Next page">›</button>
+            </div>
+            <div class="zoom-controls" aria-label="Zoom controls" role="group">
+                <button id="btnZoomOut" class="btn icon" aria-label="Zoom out">−</button>
+                <span id="zoomLevel">150%</span>
+                <button id="btnZoomIn" class="btn icon" aria-label="Zoom in">+</button>
+                <button id="btnFitWidth" class="btn" aria-label="Fit page to workspace">Fit</button>
+            </div>
+            <div class="rotation-controls" aria-label="Page rotation" role="group">
+                <button id="btnRotateLeft" class="btn icon" aria-label="Rotate current page left">↺</button>
+                <button id="btnRotateRight" class="btn icon" aria-label="Rotate current page right">↻</button>
+            </div>
         </div>
-
-        <button id="btnProperties" class="btn" aria-expanded="false" aria-controls="properties-sidebar">Properties</button>
-        <button id="btnVersions" class="btn" disabled>Versions</button>
-        <button id="btnPages" class="btn" disabled>Pages</button>
-        <button id="btnOrganize" class="btn organize" disabled>Auto-organize</button>
-        <button id="btnSave" class="btn success" disabled>Save PDF</button>
+        <div class="toolbar-options">
+            <button id="btnProperties" class="btn" aria-expanded="false" aria-controls="properties-sidebar">Properties</button>
+            <button id="btnVersions" class="btn" disabled>Versions</button>
+            <button id="btnPages" class="btn" disabled>Pages</button>
+            <button id="btnOrganize" class="btn organize" disabled>Auto-organize</button>
+        </div>
     </header>
 
     <!-- Main Workspace -->
@@ -255,6 +256,7 @@
             <form method="dialog"><button class="btn">Close</button></form>
         </header>
         <ul class="release-notes">
+            <li><strong>Mobile editing</strong> Undo and Redo stay in the top toolbar and keep your place in the PDF.</li>
             <li><strong>Fonts and signatures</strong> Choose a font for text, or place a typed or hand-drawn signature.</li>
             <li><strong>Move PDF content</strong> Drag selectable text or pick up a page area, including artwork and scanned text.</li>
             <li><strong>Mobile and desktop</strong> Pinch to zoom in Select mode on phones, or install the editor as a web app.</li>

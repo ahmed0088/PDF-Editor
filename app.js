@@ -103,12 +103,18 @@ function updateSelectedProperty(name, value) {
         setStatus('Font updated');
         return;
     }
+    if (data.type !== 'text' && data.type !== 'shape') return;
+    if (data.type === 'text' && !['fontSize', 'textColor'].includes(name)) return;
+    if (data.type === 'shape' && !['shapeColor', 'opacity'].includes(name)) return;
     if (name === 'fontSize' && data.type === 'text') data.size = Math.max(6, Math.min(72, Number(value) || 12));
     if (name === 'textColor' && data.type === 'text') data.color = value;
     if (name === 'shapeColor' && data.type === 'shape') data.color = value;
     if (name === 'opacity' && data.type === 'shape') data.opacity = Number(value);
+    const wrapper = selected.parentElement;
+    const replacement = createDOMElement(data, wrapper, Number(selected.dataset.page), wrapper.pdfViewport);
+    selected.replaceWith(replacement);
+    setSelection(replacement);
     saveHistory();
-    renderPages();
     setStatus('Property updated');
 }
 
@@ -245,8 +251,7 @@ async function renderPages() {
         wrapper.appendChild(overlay);
 
         // Draw existing elements for this page
-        const pageEls = state.elements.get(i) || [];
-        pageEls.forEach(elData => createDOMElement(elData, wrapper, i, viewport));
+        renderPageEdits(wrapper, i);
 
         viewer.appendChild(wrapper);
         wrapper.addEventListener('click', () => {
@@ -261,6 +266,10 @@ async function renderPages() {
         overlay.addEventListener('pointercancel', () => { signatureTapStarted = false; });
         overlay.addEventListener('click', event => {
             if (state.tool === 'signature' && signatureTapStarted) placeSignature(event, wrapper);
+            if (state.tool === 'text' && event.target === overlay) {
+                const rect = overlay.getBoundingClientRect();
+                createTextElement(event.clientX - rect.left, event.clientY - rect.top, i, viewport, wrapper);
+            }
             signatureTapStarted = false;
         });
         setupAreaSelection(wrapper, overlay);
@@ -304,7 +313,7 @@ function setupOverlayEvents(overlay, pageNum, viewport) {
 
     // Click to deselect
     overlay.addEventListener('pointerdown', (e) => {
-        if (e.target !== overlay || state.tool === 'area' || state.tool === 'signature') return; // Ignore clicks on elements
+        if (!e.isPrimary || e.button !== 0 || e.target !== overlay || ['area', 'signature', 'text'].includes(state.tool)) return; // Ignore clicks on elements
 
         if (overlay.setPointerCapture) overlay.setPointerCapture(e.pointerId);
 
@@ -314,9 +323,7 @@ function setupOverlayEvents(overlay, pageNum, viewport) {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
-        if (state.tool === 'text') {
-            createTextElement(x, y, pageNum, viewport, overlay.parentElement);
-        } else if (state.tool === 'whiteout' || state.tool === 'highlight' || state.tool === 'rectangle') {
+        if (state.tool === 'whiteout' || state.tool === 'highlight' || state.tool === 'rectangle') {
             isDrawing = true;
             startX = x; startY = y;
             tempEl = document.createElement('div');
@@ -345,7 +352,7 @@ function setupOverlayEvents(overlay, pageNum, viewport) {
         }
     });
 
-    window.addEventListener('pointermove', (e) => {
+    overlay.addEventListener('pointermove', (e) => {
         if (!isDrawing) return;
         const rect = overlay.getBoundingClientRect();
         let x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
@@ -365,7 +372,7 @@ function setupOverlayEvents(overlay, pageNum, viewport) {
         }
     });
 
-    window.addEventListener('pointerup', () => {
+    overlay.addEventListener('pointerup', () => {
         if (!isDrawing) return;
         isDrawing = false;
 
@@ -388,10 +395,9 @@ function setupOverlayEvents(overlay, pageNum, viewport) {
                     color: state.tool === 'whiteout' ? '#ffffff' : state.tool === 'highlight' ? '#ffeb3b' : document.getElementById('shapeColor').value,
                     opacity: state.tool === 'whiteout' ? 1 : state.tool === 'highlight' ? 0.4 : Number(document.getElementById('opacity').value)
                 };
-                saveState(newElData, pageNum, overlay.parentElement, viewport);
-            } else {
-                tempEl.remove();
+                saveState(newElData, pageNum, overlay.parentElement);
             }
+            tempEl.remove();
             tempEl = null;
         } else if (state.tool === 'draw' && svgCanvas) {
             if (currentPath.length > 2) {
@@ -407,13 +413,20 @@ function setupOverlayEvents(overlay, pageNum, viewport) {
                 };
 
                 // Keep the SVG visually but convert to state
-                saveState(newElData, pageNum, overlay.parentElement, viewport);
+                saveState(newElData, pageNum, overlay.parentElement);
                 svgCanvas.remove(); // Remove temp SVG, recreate via DOM element based on state
             } else {
                 svgCanvas.remove();
             }
             svgCanvas = null;
         }
+    });
+    overlay.addEventListener('pointercancel', () => {
+        isDrawing = false;
+        tempEl?.remove();
+        svgCanvas?.remove();
+        tempEl = null;
+        svgCanvas = null;
     });
 }
 
@@ -426,11 +439,12 @@ function createTextElement(x, y, pageNum, viewport, container) {
     const input = document.createElement('input');
     input.type = 'text';
     input.setAttribute('aria-label', 'Text to add to the PDF');
+    input.enterKeyHint = 'done';
     input.placeholder = 'Type here…';
     input.style.position = 'absolute';
     input.style.left = x + 'px';
     input.style.top = y + 'px';
-    input.style.fontSize = (size * scale) + 'px';
+    input.style.fontSize = `${Math.max(matchMedia('(max-width: 620px)').matches ? 16 : 0, size * scale)}px`;
     applyTextFont(input, propertyInputs.textFont.value);
     input.style.border = '2px solid #3b82f6';
     input.style.borderRadius = '5px';
@@ -442,7 +456,8 @@ function createTextElement(x, y, pageNum, viewport, container) {
     input.style.outline = 'none';
 
     container.appendChild(input);
-    requestAnimationFrame(() => { input.focus(); input.select(); });
+    input.focus();
+    input.select();
 
     let finished = false;
     const finalizeText = () => {
@@ -459,7 +474,7 @@ function createTextElement(x, y, pageNum, viewport, container) {
                 font: propertyInputs.textFont.value,
                 color: document.getElementById('textColor').value
             };
-            saveState(newElData, pageNum, container, viewport);
+            saveState(newElData, pageNum, container);
             setStatus('Text added — choose Select to move it or double-click to edit');
         } else {
             setStatus('Text entry cancelled');
@@ -486,10 +501,11 @@ function editTextElement(element) {
     input.type = 'text';
     input.value = data.text;
     input.setAttribute('aria-label', 'Edit PDF text');
+    input.enterKeyHint = 'done';
     input.className = 'inline-text-editor';
     input.style.left = element.style.left;
     input.style.top = element.style.top;
-    input.style.fontSize = element.style.fontSize;
+    input.style.fontSize = `${Math.max(matchMedia('(max-width: 620px)').matches ? 16 : 0, parseFloat(element.style.fontSize))}px`;
     applyTextFont(input, data.font);
     input.style.color = data.color || '#000000';
     input.style.width = `${Math.max(element.offsetWidth + 32, 150)}px`;
@@ -501,19 +517,27 @@ function editTextElement(element) {
         finished = true;
         if (!cancelled && input.value.trim()) {
             const next = { ...data, text: input.value.trim() };
-            updateStateData(next, Number(element.dataset.page), data);
+            const pageNum = Number(element.dataset.page);
+            const wrapper = element.parentElement;
+            updateStateData(next, pageNum, data);
+            if (wrapper) {
+                const replacement = createDOMElement(next, wrapper, pageNum, wrapper.pdfViewport);
+                element.replaceWith(replacement);
+                setSelection(replacement);
+            }
             saveHistory();
             setStatus('Text updated');
         }
+        element.style.visibility = '';
         input.remove();
-        renderPages();
     };
     input.addEventListener('blur', () => finish());
     input.addEventListener('keydown', e => {
         if (e.key === 'Enter') { e.preventDefault(); finish(); }
         if (e.key === 'Escape') { e.preventDefault(); finish(true); }
     });
-    requestAnimationFrame(() => { input.focus(); input.select(); });
+    input.focus();
+    input.select();
 }
 
 function createDOMElement(elData, container, pageNum, viewport) {
@@ -701,13 +725,13 @@ function setupGlobalDrag() {
 }
 
 // --- State Management ---
-function saveState(newElData, pageNum, container, viewport) {
+function saveState(newElData, pageNum, container) {
     const pageEls = state.elements.get(pageNum) || [];
     pageEls.push(newElData);
     state.elements.set(pageNum, pageEls);
 
     saveHistory();
-    renderPages(); // Re-render to show the finalized element
+    if (container.isConnected) createDOMElement(newElData, container, pageNum, container.pdfViewport);
 }
 
 function updateStateData(newData, pageNum, domEl) {
@@ -732,30 +756,32 @@ function saveHistory() {
     updateUndoRedoButtons();
 }
 
+function renderPageEdits(wrapper, pageNum) {
+    wrapper.querySelectorAll(':scope > .editor-element, :scope > .saved-drawing').forEach(element => element.remove());
+    const elements = state.elements.get(pageNum) || [];
+    elements.forEach(data => createDOMElement(data, wrapper, pageNum, wrapper.pdfViewport));
+}
+
+function moveHistory(offset) {
+    const index = state.historyIndex + offset;
+    if (index < 0 || index >= state.history.length) return;
+    cancelElementDrag();
+    setSelection(null);
+    const snapshot = state.history[index];
+    state.historyIndex = index;
+    state.elements = structuredClone(snapshot.elements);
+    state.pageRotations = new Map(snapshot.rotations);
+    viewer.querySelectorAll('.page-wrapper').forEach(wrapper => renderPageEdits(wrapper, Number(wrapper.dataset.pageNum)));
+    updateUndoRedoButtons();
+    setStatus(offset < 0 ? 'Undo complete' : 'Redo complete');
+}
+
 function undo() {
-    if (state.historyIndex > 0) {
-        state.historyIndex--;
-        const snapshot = state.history[state.historyIndex];
-        state.elements = new Map();
-        snapshot.elements.forEach((val, key) => state.elements.set(key, JSON.parse(JSON.stringify(val))));
-        state.pageRotations = new Map(snapshot.rotations);
-        renderPages();
-        updateUndoRedoButtons();
-        setStatus('Undo complete');
-    }
+    moveHistory(-1);
 }
 
 function redo() {
-    if (state.historyIndex < state.history.length - 1) {
-        state.historyIndex++;
-        const snapshot = state.history[state.historyIndex];
-        state.elements = new Map();
-        snapshot.elements.forEach((val, key) => state.elements.set(key, JSON.parse(JSON.stringify(val))));
-        state.pageRotations = new Map(snapshot.rotations);
-        renderPages();
-        updateUndoRedoButtons();
-        setStatus('Redo complete');
-    }
+    moveHistory(1);
 }
 
 function updateUndoRedoButtons() {
@@ -800,7 +826,7 @@ imageInput.addEventListener('change', (e) => {
                     h: h
                 };
 
-                saveState(newElData, pageNumberToEdit, wrapper, { height: wrapper.clientHeight });
+                saveState(newElData, pageNumberToEdit, wrapper);
             }
         };
         img.src = event.target.result;
@@ -810,8 +836,30 @@ imageInput.addEventListener('change', (e) => {
 });
 
 // --- Buttons & Shortcuts ---
-btnUndo.addEventListener('click', undo);
-btnRedo.addEventListener('click', redo);
+function bindHistoryButton(button, action) {
+    let touchStart;
+    let ignoreClickUntil = 0;
+    button.addEventListener('pointerdown', event => {
+        if (event.pointerType === 'touch') touchStart = event;
+        else ignoreClickUntil = 0;
+    });
+    button.addEventListener('pointercancel', () => { touchStart = null; });
+    button.addEventListener('pointerup', event => {
+        const start = touchStart;
+        touchStart = null;
+        if (start?.pointerId !== event.pointerId || button.disabled ||
+            Math.hypot(event.clientX - start.clientX, event.clientY - start.clientY) >= 8) return;
+        // Some mobile browsers suppress the synthetic click immediately after drawing.
+        ignoreClickUntil = performance.now() + 700;
+        action();
+    });
+    button.addEventListener('click', event => {
+        if (event.detail === 0 || performance.now() >= ignoreClickUntil) action();
+    });
+}
+
+bindHistoryButton(btnUndo, undo);
+bindHistoryButton(btnRedo, redo);
 document.getElementById('btnPrevPage').addEventListener('click', () => goToPage(state.currentPage - 1));
 document.getElementById('btnNextPage').addEventListener('click', () => goToPage(state.currentPage + 1));
 pageNumber.addEventListener('change', () => goToPage(pageNumber.value));
@@ -844,11 +892,15 @@ function rotateCurrentPage(amount) {
 document.getElementById('btnRotateLeft').addEventListener('click', () => rotateCurrentPage(-90));
 document.getElementById('btnRotateRight').addEventListener('click', () => rotateCurrentPage(90));
 btnClearPage.addEventListener('click', () => {
-    if (!state.pdfDoc) return;
+    if (!state.elements.get(state.currentPage)?.length) {
+        setStatus('No edits to clear on this page');
+        return;
+    }
     state.elements.delete(state.currentPage);
     setSelection(null);
     saveHistory();
-    renderPages();
+    const wrapper = viewer.querySelector(`[data-page-num="${state.currentPage}"]`);
+    if (wrapper) renderPageEdits(wrapper, state.currentPage);
     setStatus(`Cleared edits from page ${state.currentPage}`);
 });
 btnDelete.addEventListener('click', () => {
@@ -875,8 +927,13 @@ window.addEventListener('keydown', (e) => {
         btnSave.click();
         return;
     }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
-    if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redo(); }
+    const key = e.key.toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && (key === 'z' || key === 'y')) {
+        e.preventDefault();
+        if (key === 'y' || e.shiftKey) redo();
+        else undo();
+        return;
+    }
     if (e.key === 'Delete' || e.key === 'Backspace') { if (state.selectedEl) btnDelete.click(); }
     if (e.key === 'Escape') {
         if (state.tool === 'signature') {
@@ -974,12 +1031,20 @@ function setupPinchZoom() {
 setupPinchZoom();
 
 // Zoom
-document.getElementById('btnZoomIn').addEventListener('click', () => {
-    if (state.scale < 3) { state.scale = Math.min(3, state.scale + 0.25); zoomLevelText.textContent = Math.round(state.scale * 100) + '%'; setStatus(`Zoom ${zoomLevelText.textContent}`); renderPages(); }
-});
-document.getElementById('btnZoomOut').addEventListener('click', () => {
-    if (state.scale > 0.15) { state.scale = Math.max(0.15, state.scale - 0.25); zoomLevelText.textContent = Math.round(state.scale * 100) + '%'; setStatus(`Zoom ${zoomLevelText.textContent}`); renderPages(); }
-});
+async function stepZoom(amount) {
+    if (!state.pdfDoc) return;
+    const next = Math.max(0.15, Math.min(3, state.scale + amount));
+    if (next === state.scale) return;
+    const page = state.currentPage;
+    state.scale = next;
+    zoomLevelText.textContent = Math.round(next * 100) + '%';
+    await renderPages();
+    goToPage(page);
+    setStatus(`Zoom ${zoomLevelText.textContent}`);
+}
+
+document.getElementById('btnZoomIn').addEventListener('click', () => stepZoom(0.25));
+document.getElementById('btnZoomOut').addEventListener('click', () => stepZoom(-0.25));
 
 // --- Save PDF ---
 btnSave.addEventListener('click', () => savePDF());
