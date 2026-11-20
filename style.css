@@ -136,6 +136,14 @@ body {
     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
 }
 .page-wrapper canvas { display: block; }
+.saved-drawing {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 7;
+    pointer-events: none;
+}
 
 /* Interactable Overlay */
 .overlay-layer {

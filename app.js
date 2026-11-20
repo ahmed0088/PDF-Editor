@@ -9,7 +9,8 @@ const state = {
     selectedEl: null,
     history: [],
     historyIndex: -1,
-    imageBuffer: null // Temporary storage for images
+    imageBuffer: null, // Temporary storage for images
+    renderVersion: 0
 };
 
 // DOM Elements
@@ -46,13 +47,9 @@ fileInput.addEventListener('change', async (e) => {
         state.elements.clear();
         state.history = [];
         state.historyIndex = -1;
-        
-        await renderPages();
+        saveHistory();
         btnSave.disabled = false;
         viewer.classList.remove('empty-state');
-        viewer.innerHTML = '';
-        
-        // Re-render into the cleared viewer
         await renderPages();
         
     } catch (err) {
@@ -65,6 +62,7 @@ fileInput.addEventListener('change', async (e) => {
 async function renderPages() {
     viewer.innerHTML = '';
     if (!state.pdfDoc) return;
+    const renderVersion = ++state.renderVersion;
 
     for (let i = 1; i <= state.pdfDoc.numPages; i++) {
         const page = await state.pdfDoc.getPage(i);
@@ -93,6 +91,7 @@ async function renderPages() {
 
         viewer.appendChild(wrapper);
         setupOverlayEvents(overlay, i, viewport);
+        if (renderVersion !== state.renderVersion) return;
     }
     
     // Setup Global Drag for this render cycle
@@ -318,8 +317,21 @@ function createDOMElement(elData, container, pageNum, viewport) {
         div.appendChild(img);
     }
     else if (elData.type === 'draw') {
-        div.style.display = 'none'; // Hide DOM representation, handled by SVG overlay
-        return; // Don't append standard div
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.classList.add('saved-drawing');
+        svg.setAttribute('viewBox', `0 0 ${viewport.width} ${viewport.height}`);
+        svg.setAttribute('preserveAspectRatio', 'none');
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        const d = elData.path.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x * scale} ${viewport.height - (p.y * scale)}`).join(' ');
+        path.setAttribute('d', d);
+        path.setAttribute('stroke', elData.color || '#000000');
+        path.setAttribute('stroke-width', (elData.thickness || 2) * scale);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke-linecap', 'round');
+        path.setAttribute('stroke-linejoin', 'round');
+        svg.appendChild(path);
+        container.appendChild(svg);
+        return svg;
     }
 
     // Add resize handle for shapes/images
@@ -330,7 +342,8 @@ function createDOMElement(elData, container, pageNum, viewport) {
     }
 
     // Store data object on the element for easy retrieval
-    div.elData = JSON.parse(JSON.stringify(elData)); 
+    div.elData = JSON.parse(JSON.stringify(elData));
+    div.stateData = elData;
     
     // Setup Element Drag/Select
     div.addEventListener('pointerdown', (e) => {
@@ -358,6 +371,7 @@ let dragTarget = null;
 let dragType = null; // 'move' or 'resize'
 let dragStartX = 0, dragStartY = 0;
 let elStartX = 0, elStartY = 0, elStartW = 0, elStartH = 0;
+let globalDragReady = false;
 
 function startElementDrag(e, el, isResize, viewport, pageNum) {
     dragTarget = el;
@@ -372,6 +386,8 @@ function startElementDrag(e, el, isResize, viewport, pageNum) {
 }
 
 function setupGlobalDrag() {
+    if (globalDragReady) return;
+    globalDragReady = true;
     window.addEventListener('pointermove', (e) => {
         if (!dragTarget) return;
         e.preventDefault();
@@ -410,8 +426,10 @@ function setupGlobalDrag() {
         }
 
         // Update state
+        const previousStateData = dragTarget.stateData;
+        updateStateData(newData, pageNum, previousStateData);
         dragTarget.elData = newData;
-        updateStateData(newData, pageNum, dragTarget);
+        dragTarget.stateData = newData;
         
         saveHistory();
         dragTarget = null;
@@ -430,11 +448,7 @@ function saveState(newElData, pageNum, container, viewport) {
 
 function updateStateData(newData, pageNum, domEl) {
     const pageEls = state.elements.get(pageNum) || [];
-    // Find matching element by coordinates (simple hack for this scope)
-    const index = pageEls.findIndex(el => 
-        Math.abs(el.x - domEl.elData.x) < 1 && 
-        Math.abs(el.y - domEl.elData.y) < 1
-    );
+    const index = pageEls.indexOf(domEl);
     if (index !== -1) {
         pageEls[index] = newData;
     }
@@ -529,18 +543,13 @@ btnUndo.addEventListener('click', undo);
 btnRedo.addEventListener('click', redo);
 btnDelete.addEventListener('click', () => {
     if (!state.selectedEl) return;
-    const container = state.selectedEl.parentElement;
+    const selected = state.selectedEl;
+    const container = selected.parentElement;
     const pageNum = parseInt(container.dataset.pageNum);
-    
-    // Remove from DOM
-    state.selectedEl.remove();
-    
-    // Remove from State (Basic match)
+
+    selected.remove();
     const pageEls = state.elements.get(pageNum) || [];
-    const idx = pageEls.findIndex(el => 
-        Math.abs(el.x - state.selectedEl.elData.x) < 1 && 
-        Math.abs(el.y - state.selectedEl.elData.y) < 1
-    );
+    const idx = pageEls.indexOf(selected.stateData);
     if (idx !== -1) pageEls.splice(idx, 1);
     
     state.selectedEl = null;
