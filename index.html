@@ -44,6 +44,7 @@
         </div>
 
         <button id="btnProperties" class="btn" aria-expanded="false" aria-controls="properties-sidebar">Properties</button>
+        <button id="btnPages" class="btn" disabled>Pages</button>
         <button id="btnOrganize" class="btn organize" disabled>Auto-organize</button>
         <button id="btnSave" class="btn success" disabled>Save PDF</button>
     </header>
@@ -54,6 +55,7 @@
         <aside id="tool-sidebar">
             <button class="tool-btn active" data-tool="select" title="Select and move (V)"><span>↖</span><small>Select</small></button>
             <button class="tool-btn" data-tool="text" title="Add text (T)"><span>T</span><small>Text</small></button>
+            <button class="tool-btn" data-tool="replace" title="Replace or move PDF text (E)"><span>↔</span><small>Edit PDF text</small></button>
             <button class="tool-btn" data-tool="whiteout" title="Cover visually; underlying content remains (R)"><span>□</span><small>Cover</small></button>
             <button class="tool-btn" data-tool="highlight" title="Highlight (H)"><span>▰</span><small>Mark</small></button>
             <button class="tool-btn" data-tool="rectangle" title="Add rectangle (B)"><span>▭</span><small>Shape</small></button>
@@ -156,8 +158,37 @@
             <button id="organizerPrint" class="btn primary">Print / Save PDF</button>
         </footer>
     </dialog>
+    <dialog id="pageTools" class="compact-dialog" aria-labelledby="pageToolsTitle">
+        <form id="pageToolsForm">
+            <header class="organizer-header"><h2 id="pageToolsTitle">Export pages</h2>
+                <button type="button" class="btn" data-close>Close</button>
+            </header>
+            <p>Choose which pages to keep and the order they appear in the new PDF. Your edits are included.</p>
+            <label>Pages and order<input id="exportOrder" type="text" required aria-describedby="pageOrderHelp"></label>
+            <p id="pageOrderHelp">Use commas or ranges, for example 3, 1–2. Leave out pages you want to remove.</p>
+            <div class="dialog-actions">
+                <button type="button" id="exportCurrent" class="btn">Current page</button>
+                <button type="button" id="exportAll" class="btn">All pages</button>
+                <button class="btn primary">Download PDF</button>
+            </div>
+            <p id="pageExportError" role="alert"></p>
+        </form>
+    </dialog>
+    <dialog id="replaceText" class="compact-dialog" aria-labelledby="replaceTextTitle">
+        <form id="replaceTextForm">
+            <header class="organizer-header"><h2 id="replaceTextTitle">Edit PDF text</h2>
+                <button type="button" class="btn" data-close>Close</button>
+            </header>
+            <label>Replacement text<input id="replacementValue" type="text" required></label>
+            <label>Background color<input id="replacementBackground" type="color" value="#ffffff"></label>
+            <p>The original text is covered and remains in the file. Use this on solid backgrounds. Select and drag the replacement to move it.</p>
+            <div class="dialog-actions"><button type="submit" class="btn primary">Apply replacement</button></div>
+            <p id="replaceError" role="alert"></p>
+        </form>
+    </dialog>
     <section id="printReport" aria-label="Organized PDF report"></section>
     <script src="app.js"></script>
     <script src="organizer.js"></script>
+    <script src="document-tools.js"></script>
 </body>
 </html>

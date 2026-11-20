@@ -52,13 +52,14 @@ function updatePageControls() {
     pageNumber.value = total ? state.currentPage : 1;
     btnClearPage.disabled = !total;
     document.getElementById("btnOrganize").disabled = !total;
+    document.getElementById("btnPages").disabled = !total;
     document.getElementById('btnPrevPage').disabled = !total || state.currentPage <= 1;
     document.getElementById('btnNextPage').disabled = !total || state.currentPage >= total;
 }
 
 function goToPage(page) {
     if (!state.pdfDoc) return;
-    state.currentPage = Math.max(1, Math.min(state.pdfDoc.numPages, Number(page) || 1));
+    state.currentPage = Math.max(1, Math.min(state.pdfDoc.numPages, Math.trunc(Number(page)) || 1));
     const wrapper = document.querySelector(`.page-wrapper[data-page-num="${state.currentPage}"]`);
     if (wrapper) wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
     updatePageControls();
@@ -207,6 +208,7 @@ async function renderPages() {
         const viewport = page.getViewport({ scale: state.scale });
 
         const wrapper = document.createElement('div');
+        wrapper.pdfViewport = viewport;
         wrapper.className = 'page-wrapper';
         wrapper.dataset.pageNum = i;
         wrapper.style.width = viewport.width + 'px';
@@ -234,6 +236,7 @@ async function renderPages() {
             updatePageControls();
         });
         setupOverlayEvents(overlay, i, viewport);
+        if (state.tool === "replace") addSourceTextTargets(wrapper);
         if (renderVersion !== state.renderVersion) return;
     }
 
@@ -249,7 +252,10 @@ function updateToolUI() {
     document.querySelectorAll('.overlay-layer').forEach(overlay => {
         overlay.className = `overlay-layer mode-${state.tool}`;
     });
-    const names = { select: 'Select and move', text: 'Click anywhere to type', whiteout: 'Drag to cover content', highlight: 'Drag to highlight', rectangle: 'Drag to add a rectangle', draw: 'Draw or sign' };
+    if (state.tool === 'replace') {
+        document.querySelectorAll('.page-wrapper').forEach(addSourceTextTargets);
+    }
+    const names = { replace: 'Select existing text to replace it · works on selectable text', select: 'Select and move', text: 'Click anywhere to type', whiteout: 'Drag to cover content', highlight: 'Drag to highlight', rectangle: 'Drag to add a rectangle', draw: 'Draw or sign' };
     setStatus(state.pdfDoc ? names[state.tool] : 'Ready — open a PDF to begin');
 }
 
@@ -801,13 +807,18 @@ btnDelete.addEventListener('click', () => {
 });
 
 window.addEventListener('keydown', (e) => {
-    if (!loader.classList.contains('hidden') || document.getElementById('organizer').open ||
+    if (!loader.classList.contains('hidden') || document.querySelector('dialog[open]') ||
         e.target.closest?.('input, textarea, select, [contenteditable]')) return;
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && state.pdfDoc) {
+        e.preventDefault();
+        btnSave.click();
+        return;
+    }
     if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
     if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redo(); }
     if (e.key === 'Delete' || e.key === 'Backspace') { if (state.selectedEl) btnDelete.click(); }
     if (e.key === 'Escape') setSelection(null);
-    const shortcuts = { v: 'select', t: 'text', r: 'whiteout', h: 'highlight', b: 'rectangle', d: 'draw' };
+    const shortcuts = { e: 'replace', v: 'select', t: 'text', r: 'whiteout', h: 'highlight', b: 'rectangle', d: 'draw' };
     const tool = shortcuts[e.key.toLowerCase()];
     if (tool) { state.tool = tool; updateToolUI(); }
 });
@@ -821,8 +832,10 @@ document.getElementById('btnZoomOut').addEventListener('click', () => {
 });
 
 // --- Save PDF ---
-btnSave.addEventListener('click', async () => {
-    if (!state.originalBytes) return;
+btnSave.addEventListener('click', () => savePDF());
+
+async function savePDF(pageOrder) {
+    if (!state.originalBytes || !loader.classList.contains('hidden')) return;
     loader.classList.remove('hidden');
     loaderText.textContent = 'Building your edited PDF…';
 
@@ -832,7 +845,7 @@ btnSave.addEventListener('click', async () => {
         const pages = pdfDoc.getPages();
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-        for (let i = 1; i <= pages.length; i++) {
+        for (const i of pageOrder || pages.map((_, index) => index + 1)) {
             const page = pages[i - 1];
             const rotation = state.pageRotations.get(i);
             const originalRotation = page.getRotation().angle;
@@ -900,8 +913,12 @@ btnSave.addEventListener('click', async () => {
             }
         }
 
+        if (pageOrder && (pageOrder.length !== pages.length || pageOrder.some((number, index) => number !== index + 1))) {
+            for (let index = pages.length - 1; index >= 0; index--) pdfDoc.removePage(index);
+            pageOrder.forEach(number => pdfDoc.addPage(pages[number - 1]));
+        }
         const finalBytes = await pdfDoc.save();
-        downloadBlob(new Blob([finalBytes], { type: 'application/pdf' }), `${fileStem()}-edited.pdf`);
+        downloadBlob(new Blob([finalBytes], { type: 'application/pdf' }), `${fileStem()}-${pageOrder ? 'pages' : 'edited'}.pdf`);
         setStatus('PDF downloaded successfully');
 
     } catch (err) {
@@ -909,6 +926,6 @@ btnSave.addEventListener('click', async () => {
     } finally {
         loader.classList.add('hidden');
     }
-});
+}
 
 init();

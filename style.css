@@ -215,3 +215,25 @@ button, label { user-select: none; }
         background: var(--panel);
     }
 }
+
+.compact-dialog {
+    margin: auto;
+    width: min(490px, calc(100% - 24px));
+    max-height: calc(100dvh - 24px);
+    padding: 24px;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+}
+.compact-dialog::backdrop { background: rgba(3, 7, 18, .78); }
+.compact-dialog form, .compact-dialog label { display: grid; gap: 10px; }
+.compact-dialog p { color: var(--muted); font-size: .85rem; line-height: 1.5; }
+.compact-dialog p:empty { display: none; }
+.compact-dialog input { padding: 8px; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 7px; }
+.compact-dialog input[type="color"] { padding: 2px; }
+.dialog-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.source-text-targets { display: none; position: absolute; inset: 0; z-index: 6; pointer-events: none; color: #334155; font-size: .85rem; }
+.overlay-layer.mode-replace ~ .source-text-targets { display: block; }
+.source-text-targets button { position: absolute; pointer-events: auto; cursor: text; border: 1px solid #4d5ad755; background: #5868ec12; padding: 0; }
+.source-text-targets button:hover, .source-text-targets button:focus-visible { background: #5868ec38; outline: 2px solid #5868ec; }
