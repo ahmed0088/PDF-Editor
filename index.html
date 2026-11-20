@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pro PDF Editor | Web</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="theme-color" content="#11182a">
     <link rel="stylesheet" href="style.css">
     <!-- PDF.js for rendering -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -57,6 +60,7 @@
             <button class="tool-btn active" data-tool="select" title="Select and move (V)"><span>↖</span><small>Select</small></button>
             <button class="tool-btn" data-tool="text" title="Add text (T)"><span>T</span><small>Text</small></button>
             <button class="tool-btn" data-tool="replace" title="Replace or move PDF text (E)"><span>↔</span><small>Edit PDF text</small></button>
+            <button class="tool-btn" data-tool="area" title="Select a page area (M)"><span>⊞</span><small>Move area</small></button>
             <button class="tool-btn" data-tool="whiteout" title="Cover visually; underlying content remains (R)"><span>□</span><small>Cover</small></button>
             <button class="tool-btn" data-tool="highlight" title="Highlight (H)"><span>▰</span><small>Mark</small></button>
             <button class="tool-btn" data-tool="rectangle" title="Add rectangle (B)"><span>▭</span><small>Shape</small></button>
@@ -108,7 +112,7 @@
         </aside>
     </main>
 
-    <footer id="statusbar"><span id="statusText" role="status">Ready — open a PDF to begin</span><span class="shortcut-hint">V select · T text · R cover · H highlight · B shape · D draw · Delete remove</span><button id="btnWhatsNew" class="status-link" type="button">What’s new</button></footer>
+    <footer id="statusbar"><span id="statusText" role="status">Ready — open a PDF to begin</span><span class="shortcut-hint">V select · T text · R cover · H highlight · B shape · D draw · Delete remove</span><button id="btnInstall" class="status-link" type="button">Install app</button><button id="btnWhatsNew" class="status-link" type="button">What’s new</button></footer>
 
     <!-- Loader -->
     <div id="loader" class="hidden">
@@ -127,6 +131,7 @@
         <p class="organizer-help">Extract text into a searchable report with the original page references. Check the reading order on tables and multi-column pages before exporting.</p>
         <div class="organizer-controls">
             <label>Search text<input id="organizerSearch" type="search" placeholder="Filter rows"></label>
+            <label>Page<select id="organizerPage"><option value="">All pages</option></select></label>
             <label>Layout<select id="organizerLayout">
                 <option value="reading">Reading order</option>
                 <option value="table">Align table rows</option>
@@ -143,7 +148,9 @@
                 <option value="mdy">Month / day / year</option>
             </select></label>
         </div>
-        <p id="organizerStatus" role="status"></p>
+        <div class="report-status"><p id="organizerStatus" role="status"></p>
+            <button id="organizerAdd" class="btn" type="button" disabled>Add row</button>
+        </div>
         <div class="organizer-list">
             <table>
                 <thead><tr><th scope="col" class="report-selection">Keep</th><th scope="col">Page</th><th scope="col">Date</th><th scope="col">Extracted text</th></tr></thead>
@@ -158,6 +165,19 @@
             <button id="organizerCsv" class="btn">Export CSV</button>
             <button id="organizerPrint" class="btn primary">Print / Save PDF</button>
         </footer>
+    </dialog>
+    <dialog id="reportRowEditor" class="compact-dialog" aria-labelledby="reportRowTitle">
+        <form id="reportRowForm">
+            <header class="organizer-header"><h2 id="reportRowTitle">Edit report row</h2>
+                <button id="cancelReportRow" class="btn" type="button">Close</button>
+            </header>
+            <label>Source page<input id="reportRowPage" type="number" min="1" required></label>
+            <label>Row text<textarea id="reportRowText" rows="4" dir="auto" required></textarea></label>
+            <div class="dialog-actions">
+                <button id="resetReportRow" type="button" class="btn">Use extracted text</button>
+                <button type="submit" class="btn primary">Save row</button>
+            </div>
+        </form>
     </dialog>
     <dialog id="pageTools" class="compact-dialog" aria-labelledby="pageToolsTitle">
         <form id="pageToolsForm">
@@ -180,10 +200,10 @@
             <header class="organizer-header"><h2 id="replaceTextTitle">Edit PDF text</h2>
                 <button type="button" class="btn" data-close>Close</button>
             </header>
-            <label>Replacement text<input id="replacementValue" type="text" required></label>
+            <label>Replacement text<input id="replacementValue" type="text" dir="auto"></label>
             <label>Background color<input id="replacementBackground" type="color" value="#ffffff"></label>
-            <p>The original text is covered and remains in the file. Use this on solid backgrounds. Select and drag the replacement to move it.</p>
-            <div class="dialog-actions"><button type="submit" class="btn primary">Apply replacement</button></div>
+            <p>Pick up the area to keep its appearance, or type a replacement. The original content stays under the cover.</p>
+            <div class="dialog-actions"><button type="button" id="pickUpArea" class="btn">Pick up area</button><button type="submit" class="btn primary">Apply replacement</button></div>
             <p id="replaceError" role="alert"></p>
         </form>
     </dialog>
@@ -204,16 +224,30 @@
             <form method="dialog"><button class="btn">Close</button></form>
         </header>
         <ul class="release-notes">
+            <li><strong>Move PDF content</strong> Drag selectable text or pick up a page area, including artwork and scanned text.</li>
+            <li><strong>Mobile and desktop</strong> Use touch controls on phones or install the editor as a web app.</li>
             <li><strong>Versions</strong> Save named checkpoints and restore them in the same browser.</li>
             <li><strong>Edit PDF text</strong> Select existing text, cover it, and add a replacement you can move.</li>
             <li><strong>Export pages</strong> Extract or reorder pages while keeping your edits.</li>
             <li><strong>Auto-organize</strong> Review extracted text, sort or filter it, and export it to CSV or PDF.</li>
         </ul>
     </dialog>
+    <dialog id="installHelp" class="compact-dialog" aria-labelledby="installHelpTitle">
+        <header class="organizer-header"><h2 id="installHelpTitle">Install PDF Editor</h2>
+            <form method="dialog"><button class="btn">Close</button></form>
+        </header>
+        <p class="dialog-note">Open the hosted editor in a browser that supports installing web apps.</p>
+        <ol>
+            <li>On Windows, open the Chrome or Edge menu and choose the option to install this site as an app.</li>
+            <li>On iPhone or iPad, open Safari’s Share menu and choose Add to Home Screen.</li>
+            <li>On Android, open Chrome’s menu and choose Install app or Add to Home screen.</li>
+        </ol>
+    </dialog>
     <section id="printReport" aria-label="Organized PDF report"></section>
     <script src="app.js"></script>
     <script src="organizer.js"></script>
     <script src="document-tools.js"></script>
     <script src="versions.js"></script>
+    <script src="install.js"></script>
 </body>
 </html>

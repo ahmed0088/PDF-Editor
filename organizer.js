@@ -12,6 +12,15 @@ const nextRows = document.getElementById('organizerNext');
 const csvButton = document.getElementById('organizerCsv');
 const printButton = document.getElementById('organizerPrint');
 const printReport = document.getElementById('printReport');
+const pageFilter = document.getElementById('organizerPage');
+const addReportRow = document.getElementById('organizerAdd');
+const rowEditor = document.getElementById('reportRowEditor');
+const editorText = document.getElementById('reportRowText');
+const editorPage = document.getElementById('reportRowPage');
+const resetReportRow = document.getElementById('resetReportRow');
+const revisedRows = new Map();
+const manualRows = [];
+let rowToEdit;
 const pageSize = 100;
 let cachedDocument;
 let extractedRows = [];
@@ -133,6 +142,15 @@ function createReportRows(rows, clickable) {
         const cell = tr.insertCell();
         cell.dir = 'auto';
         cell.textContent = row.text;
+        if (clickable) {
+            const edit = document.createElement('button');
+            edit.type = 'button';
+            edit.className = 'source-page edit-report-row';
+            edit.textContent = 'Edit';
+            edit.setAttribute('aria-label', `Edit report row ${row.number}, page ${row.page}`);
+            edit.addEventListener('click', () => openReportRow(row));
+            cell.append(edit);
+        }
         fragment.append(tr);
     }
     return fragment;
@@ -149,13 +167,15 @@ function renderPreview() {
     document.querySelector('.organizer-list').scrollTop = 0;
 }
 
-function applyReportControls() {
+function applyReportControls(keepPage = false) {
     const normalize = text => text.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
     const query = normalize(searchRows.value);
     const source = layoutRows.value === 'table' ? tableRows : extractedRows;
     visibleRows = source
-        .map((row, index) => ({ ...row, id: `${layoutRows.value}-${index}`, number: index + 1 }))
-        .filter(row => normalize(row.text).includes(query))
+        .map((row, index) => ({ ...row, id: `${layoutRows.value}-${index}`, number: index + 1, original: row.text }))
+        .concat(manualRows.map((row, index) => ({ ...row, number: source.length + index + 1 })))
+        .map(row => ({ ...row, text: revisedRows.get(row.id) ?? row.text }))
+        .filter(row => (!pageFilter.value || row.page === Number(pageFilter.value)) && normalize(row.text).includes(query))
         .map(row => ({ ...row, date: detectedDate(row.text, dateFormat.value) }));
     if (sortRows.value === 'text') {
         const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
@@ -163,10 +183,44 @@ function applyReportControls() {
     } else if (sortRows.value.startsWith('date')) {
         const direction = sortRows.value === 'dateAsc' ? 1 : -1;
         visibleRows.sort((a, b) => Number(!a.date) - Number(!b.date) || direction * a.date.localeCompare(b.date));
+    } else {
+        visibleRows.sort((a, b) => a.page - b.page);
     }
-    previewPage = 0;
+    previewPage = keepPage ? Math.min(previewPage, Math.max(0, Math.ceil(visibleRows.length / pageSize) - 1)) : 0;
     renderPreview();
 }
+
+function openReportRow(row) {
+    rowToEdit = row;
+    document.getElementById('reportRowTitle').textContent = row ? 'Edit report row' : 'Add report row';
+    editorText.value = row?.text || '';
+    editorPage.max = state.pdfDoc.numPages;
+    editorPage.value = row?.page || pageFilter.value || state.currentPage;
+    editorPage.readOnly = Boolean(row);
+    resetReportRow.hidden = row?.original === undefined;
+    rowEditor.showModal();
+    editorText.focus();
+}
+
+addReportRow.addEventListener('click', () => openReportRow());
+document.getElementById('cancelReportRow').addEventListener('click', () => rowEditor.close());
+resetReportRow.addEventListener('click', () => { editorText.value = rowToEdit.original; });
+document.getElementById('reportRowForm').addEventListener('submit', event => {
+    event.preventDefault();
+    const text = editorText.value.trim();
+    if (!text) {
+        editorText.value = '';
+        editorText.reportValidity();
+        return;
+    }
+    if (rowToEdit) {
+        revisedRows.set(rowToEdit.id, text);
+    } else {
+        manualRows.push({ page: Number(editorPage.value), text, id: `manual-${manualRows.length}` });
+    }
+    rowEditor.close();
+    applyReportControls(true);
+});
 
 function rowsForExport() {
     return visibleRows.filter(row => !excluded.has(row.id));
@@ -177,7 +231,7 @@ function updateReportStatus() {
     const kept = rowsForExport().length;
     csvButton.disabled = printButton.disabled = !kept;
     restoreRows.disabled = !excluded.size;
-    const messages = [`${visibleRows.length.toLocaleString()} of ${source.length.toLocaleString()} rows · ${kept.toLocaleString()} ready to export`];
+    const messages = [`${visibleRows.length.toLocaleString()} of ${(source.length + manualRows.length).toLocaleString()} rows · ${kept.toLocaleString()} ready to export`];
     if (pagesWithoutText.length) {
         const sample = pagesWithoutText.slice(0, 12).join(', ');
         messages.push(`Pages without extractable text (${pagesWithoutText.length}): ${sample}${pagesWithoutText.length > 12 ? ', …' : ''}. Scanned pages need OCR first.`);
@@ -199,6 +253,13 @@ organizeButton.addEventListener('click', async () => {
     extractedRows = [];
     tableRows = [];
     excluded.clear();
+    revisedRows.clear();
+    manualRows.length = 0;
+    addReportRow.disabled = true;
+    pageFilter.length = 1;
+    for (let number = 1; number <= documentToRead.numPages; number++) {
+        pageFilter.add(new Option(`Page ${number}`, number));
+    }
     visibleRows = [];
     pagesWithoutText = [];
     previewPage = 0;
@@ -225,6 +286,7 @@ organizeButton.addEventListener('click', async () => {
         tableRows = alignedRows;
         pagesWithoutText = emptyPages;
         cachedDocument = documentToRead;
+        addReportRow.disabled = false;
         applyReportControls();
     } catch (error) {
         if (version === extractionVersion) organizerStatus.textContent = `Could not read the document. ${error.message}`;
@@ -232,14 +294,15 @@ organizeButton.addEventListener('click', async () => {
 });
 
 organizer.addEventListener('close', () => extractionVersion++);
-searchRows.addEventListener('input', applyReportControls);
-layoutRows.addEventListener('change', applyReportControls);
+searchRows.addEventListener('input', () => applyReportControls());
+pageFilter.addEventListener('change', () => applyReportControls());
+layoutRows.addEventListener('change', () => applyReportControls());
 restoreRows.addEventListener('click', () => {
     excluded.clear();
     renderPreview();
 });
-sortRows.addEventListener('change', applyReportControls);
-dateFormat.addEventListener('change', applyReportControls);
+sortRows.addEventListener('change', () => applyReportControls());
+dateFormat.addEventListener('change', () => applyReportControls());
 previousRows.addEventListener('click', () => { previewPage--; renderPreview(); });
 nextRows.addEventListener('click', () => { previewPage++; renderPreview(); });
 

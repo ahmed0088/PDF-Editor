@@ -247,3 +247,57 @@ button, label { user-select: none; }
 #versionList time { display: block; color: var(--muted); font-size: .78rem; }
 .release-notes li { line-height: 1.5; font-size: .85rem; }
 .release-notes strong { display: block; }
+
+.source-text-targets button, .editor-element { touch-action: none; }
+.source-text-targets button { cursor: grab; }
+.overlay-layer.mode-area { cursor: crosshair; }
+.overlay-layer.mode-select { touch-action: pan-x pan-y; }
+.area-marker { position: absolute; pointer-events: none; border: 2px dashed #6575f5; background: #6575f529; }
+#statusText { flex: 1; min-width: 0; }
+#installHelp ol { padding-left: 22px; color: var(--muted); line-height: 1.6; }
+
+@media (max-width: 620px) {
+    body { height: 100dvh; min-width: 0; }
+    #top-toolbar { padding: 8px; gap: 5px; flex: none; }
+    #top-toolbar .btn { min-height: 36px; padding: 5px 8px; }
+    #top-toolbar .btn.icon { width: 34px; }
+    #top-toolbar #btnUndo, #top-toolbar #btnRedo, #btnFitWidth, #btnRotateLeft, #btnRotateRight { display: inline-flex; }
+    #top-toolbar #btnOpen { order: -4; }
+    #top-toolbar #btnSave { order: -3; }
+    #top-toolbar .page-controls { order: -2; }
+    #top-toolbar .brand, #top-toolbar .spacer { display: none; }
+    #workspace { flex-direction: column; }
+    #tool-sidebar {
+        order: 3;
+        width: 100%;
+        flex: none;
+        flex-direction: row;
+        gap: 4px;
+        padding: 5px 8px;
+        overflow: auto hidden;
+        overscroll-behavior-x: contain;
+        border-top: 1px solid var(--line);
+        border-right: 0;
+    }
+    #tool-sidebar .tool-btn { width: 61px; min-width: 61px; height: 49px; }
+    #tool-sidebar .tool-btn small { display: block; }
+    #viewer-container { padding: 14px 8px; }
+    #properties-sidebar.show-properties { z-index: 20; bottom: 62px; }
+    #statusbar { gap: 8px; padding-bottom: env(safe-area-inset-bottom); }
+    .compact-dialog input, .organizer-controls input, .organizer-controls select { font-size: 16px; }
+}
+
+.report-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0 8px; }
+.report-status #organizerStatus { margin: 0; }
+.report-status .btn { flex: none; }
+.edit-report-row { margin-inline-start: 8px; }
+.compact-dialog textarea { width: 100%; resize: vertical; padding: 8px; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 7px; font: inherit; }
+@media (max-width: 620px) {
+    #organizer th, #organizer td { padding: 7px 5px; }
+    .edit-report-row { display: block; margin: 5px 0 0; }
+    .compact-dialog textarea { font-size: 16px; }
+}
+
+.overlay-layer.mode-area { z-index: 12; }
+.overlay-layer.mode-replace ~ .source-text-targets { z-index: 12; }
+.compact-dialog .btn { touch-action: manipulation; }

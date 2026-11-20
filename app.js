@@ -168,6 +168,7 @@ async function openPDF(file) {
         btnSave.disabled = false;
         viewer.classList.remove('empty-state');
         updatePageControls();
+        if (matchMedia('(max-width: 620px)').matches) await fitPageWidth();
         await renderPages();
         setStatus(`${file.name} loaded · ${state.pdfDoc.numPages} page${state.pdfDoc.numPages === 1 ? '' : 's'}`);
     } catch (error) {
@@ -237,6 +238,7 @@ async function renderPages() {
             updatePageControls();
         });
         setupOverlayEvents(overlay, i, viewport);
+        setupAreaSelection(wrapper, overlay);
         if (state.tool === "replace") addSourceTextTargets(wrapper);
         if (renderVersion !== state.renderVersion) return;
     }
@@ -256,7 +258,7 @@ function updateToolUI() {
     if (state.tool === 'replace') {
         document.querySelectorAll('.page-wrapper').forEach(addSourceTextTargets);
     }
-    const names = { replace: 'Select existing text to replace it · works on selectable text', select: 'Select and move', text: 'Click anywhere to type', whiteout: 'Drag to cover content', highlight: 'Drag to highlight', rectangle: 'Drag to add a rectangle', draw: 'Draw or sign' };
+    const names = { replace: 'Tap existing text to edit it, or drag it to move it', area: 'Draw a box around content to pick it up or replace it', select: 'Select and move', text: 'Click anywhere to type', whiteout: 'Drag to cover content', highlight: 'Drag to highlight', rectangle: 'Drag to add a rectangle', draw: 'Draw or sign' };
     setStatus(state.pdfDoc ? names[state.tool] : 'Ready — open a PDF to begin');
 }
 
@@ -276,7 +278,7 @@ function setupOverlayEvents(overlay, pageNum, viewport) {
 
     // Click to deselect
     overlay.addEventListener('pointerdown', (e) => {
-        if (e.target !== overlay) return; // Ignore clicks on elements
+        if (e.target !== overlay || state.tool === 'area') return; // Ignore clicks on elements
 
         if (overlay.setPointerCapture) overlay.setPointerCapture(e.pointerId);
 
@@ -495,6 +497,7 @@ function createDOMElement(elData, container, pageNum, viewport) {
     if (elData.type === 'text') {
         div.classList.add('el-text');
         div.textContent = elData.text;
+        div.dir = 'auto';
         div.style.left = (elData.x * scale) + 'px';
         div.style.top = (viewport.height - (elData.y * scale) - (elData.size * scale)) + 'px';
         div.style.fontSize = (elData.size * scale) + 'px';
@@ -623,7 +626,7 @@ function setupGlobalDrag() {
         const container = dragTarget.parentElement;
         const pageNum = parseInt(container.dataset.pageNum);
         const scale = state.scale;
-        const viewportHeight = container.clientHeight;
+        const viewportHeight = container.pdfViewport.height;
 
         let newData = JSON.parse(JSON.stringify(dragTarget.elData));
 
@@ -764,15 +767,24 @@ btnRedo.addEventListener('click', redo);
 document.getElementById('btnPrevPage').addEventListener('click', () => goToPage(state.currentPage - 1));
 document.getElementById('btnNextPage').addEventListener('click', () => goToPage(state.currentPage + 1));
 pageNumber.addEventListener('change', () => goToPage(pageNumber.value));
-document.getElementById('btnFitWidth').addEventListener('click', () => {
-    if (!state.pdfDoc) return;
-    const first = document.querySelector('.page-wrapper');
-    const viewerWidth = document.getElementById('viewer-container').clientWidth - 80;
-    if (!first || viewerWidth < 200) return;
-    state.scale = Math.max(0.5, Math.min(3, state.scale * (viewerWidth / first.clientWidth)));
+async function fitPageWidth() {
+    const pdf = state.pdfDoc;
+    if (!pdf) return;
+    const page = await pdf.getPage(state.currentPage);
+    if (pdf !== state.pdfDoc) return;
+    const viewerContainer = document.getElementById('viewer-container');
+    const styles = getComputedStyle(viewerContainer);
+    const width = viewerContainer.clientWidth - parseFloat(styles.paddingLeft) - parseFloat(styles.paddingRight);
+    state.scale = Math.max(0.15, Math.min(3, width / page.getViewport({ scale: 1 }).width));
     zoomLevelText.textContent = Math.round(state.scale * 100) + '%';
-    setStatus('Fit to workspace');
-    renderPages();
+}
+
+document.getElementById('btnFitWidth').addEventListener('click', async () => {
+    if (!state.pdfDoc) return;
+    const page = state.currentPage;
+    await fitPageWidth();
+    await renderPages();
+    goToPage(page);
 });
 function rotateCurrentPage(amount) {
     if (!state.pdfDoc) return;
@@ -819,17 +831,17 @@ window.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redo(); }
     if (e.key === 'Delete' || e.key === 'Backspace') { if (state.selectedEl) btnDelete.click(); }
     if (e.key === 'Escape') setSelection(null);
-    const shortcuts = { e: 'replace', v: 'select', t: 'text', r: 'whiteout', h: 'highlight', b: 'rectangle', d: 'draw' };
+    const shortcuts = { m: 'area', e: 'replace', v: 'select', t: 'text', r: 'whiteout', h: 'highlight', b: 'rectangle', d: 'draw' };
     const tool = shortcuts[e.key.toLowerCase()];
     if (tool) { state.tool = tool; updateToolUI(); }
 });
 
 // Zoom
 document.getElementById('btnZoomIn').addEventListener('click', () => {
-    if (state.scale < 3) { state.scale += 0.25; zoomLevelText.textContent = Math.round(state.scale * 100) + '%'; setStatus(`Zoom ${zoomLevelText.textContent}`); renderPages(); }
+    if (state.scale < 3) { state.scale = Math.min(3, state.scale + 0.25); zoomLevelText.textContent = Math.round(state.scale * 100) + '%'; setStatus(`Zoom ${zoomLevelText.textContent}`); renderPages(); }
 });
 document.getElementById('btnZoomOut').addEventListener('click', () => {
-    if (state.scale > 0.5) { state.scale -= 0.25; zoomLevelText.textContent = Math.round(state.scale * 100) + '%'; setStatus(`Zoom ${zoomLevelText.textContent}`); renderPages(); }
+    if (state.scale > 0.15) { state.scale = Math.max(0.15, state.scale - 0.25); zoomLevelText.textContent = Math.round(state.scale * 100) + '%'; setStatus(`Zoom ${zoomLevelText.textContent}`); renderPages(); }
 });
 
 // --- Save PDF ---
@@ -845,6 +857,7 @@ async function savePDF(pageOrder) {
         const pdfDoc = await PDFDocument.load(state.originalBytes);
         const pages = pdfDoc.getPages();
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        const supportedCharacters = new Set(font.getCharacterSet());
 
         for (const i of pageOrder || pages.map((_, index) => index + 1)) {
             const page = pages[i - 1];
@@ -877,9 +890,17 @@ async function savePDF(pageOrder) {
                     const g = parseInt(hex.substring(2, 4), 16) / 255;
                     const b = parseInt(hex.substring(4, 6), 16) / 255;
 
-                    page.drawText(el.text, {
-                        ...pdfPoint(el.x, el.y), size: el.size, rotate: angle, font, color: rgb(r, g, b)
-                    });
+                    const supported = [...el.text].every(character => supportedCharacters.has(character.codePointAt(0)));
+                    if (supported) {
+                        page.drawText(el.text, {
+                            ...pdfPoint(el.x, el.y), size: el.size, rotate: angle, font, color: rgb(r, g, b)
+                        });
+                    } else {
+                        const { bytes, width, height, descent } = renderTextImage(el);
+                        page.drawImage(await pdfDoc.embedPng(bytes), {
+                            ...pdfPoint(el.x, el.y - descent), width, height, rotate: angle
+                        });
+                    }
                 }
                 else if (el.type === 'image') {
                     // Convert base64 to Uint8Array

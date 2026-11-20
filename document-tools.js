@@ -4,6 +4,7 @@ const pageExportError = document.getElementById('pageExportError');
 const replaceTextDialog = document.getElementById('replaceText');
 const replacementValue = document.getElementById('replacementValue');
 const replacementBackground = document.getElementById('replacementBackground');
+const pickUpArea = document.getElementById('pickUpArea');
 const replaceError = document.getElementById('replaceError');
 let sourceSelection;
 
@@ -61,94 +62,259 @@ document.getElementById('pageToolsForm').addEventListener('submit', event => {
     }
 });
 
+function pageBackground(wrapper, rect) {
+    const canvas = wrapper.querySelector('canvas');
+    const ctx = canvas.getContext('2d');
+    const x = Math.max(0, Math.min(canvas.width - 1, Math.floor(rect.left)));
+    const y = Math.max(0, Math.min(canvas.height - 1, Math.floor(rect.top)));
+    const [r, g, b] = ctx.getImageData(x, y, 1, 1).data;
+    return '#' + [r, g, b].map(channel => channel.toString(16).padStart(2, '0')).join('');
+}
+
+function areaSelection(wrapper, rect, text) {
+    const viewport = wrapper.pdfViewport;
+    const scale = viewport.scale;
+    return {
+        wrapper, rect, pageNum: Number(wrapper.dataset.pageNum),
+        box: { x: rect.left / scale, y: (viewport.height - rect.bottom) / scale,
+            w: (rect.right - rect.left) / scale, h: (rect.bottom - rect.top) / scale },
+        text: text || { x: rect.left / scale, y: (viewport.height - rect.top) / scale - 12, size: 12 }
+    };
+}
+
+function openAreaEditor(selection, value = '') {
+    sourceSelection = selection;
+    replacementValue.value = value;
+    replacementBackground.value = pageBackground(selection.wrapper, selection.rect);
+    replaceError.textContent = '';
+    document.getElementById('replaceTextTitle').textContent = value ? 'Edit PDF text' : 'Move or replace area';
+    replaceTextDialog.showModal();
+    if (value) replacementValue.select();
+    else pickUpArea.focus({ preventScroll: true });
+}
+
+function applyAreaEdit(selection, overlay, background) {
+    const { wrapper, pageNum, box } = selection;
+    if (!wrapper.isConnected) return;
+    const cover = { ...box, type: 'shape', color: background, opacity: 1 };
+    const elements = state.elements.get(pageNum) || [];
+    elements.push(cover, overlay);
+    state.elements.set(pageNum, elements);
+    createDOMElement(cover, wrapper, pageNum, wrapper.pdfViewport);
+    const selected = createDOMElement(overlay, wrapper, pageNum, wrapper.pdfViewport);
+    state.currentPage = pageNum;
+    state.tool = 'select';
+    if (replaceTextDialog.open) replaceTextDialog.close();
+    updatePageControls();
+    updateToolUI();
+    setSelection(selected);
+    saveHistory();
+}
+
+async function pickUpSelection(selection, background, dx = 0, dy = 0) {
+    const { wrapper, pageNum, box } = selection;
+    if (wrapper.dataset.pickingUp) return;
+    wrapper.dataset.pickingUp = 'true';
+    const modalSelection = replaceTextDialog.open;
+    const pdf = state.pdfDoc;
+    try {
+        const page = await pdf.getPage(pageNum);
+        const ratio = Math.min(3, Math.sqrt(12_000_000 / (box.w * box.h)));
+        const viewport = page.getViewport({ scale: ratio });
+        const crop = document.createElement('canvas');
+        crop.width = Math.max(1, Math.ceil(box.w * ratio));
+        crop.height = Math.max(1, Math.ceil(box.h * ratio));
+        const offset = [1, 0, 0, 1, -box.x * ratio, (box.y + box.h) * ratio - viewport.height];
+        await page.render({ canvasContext: crop.getContext('2d'), viewport, transform: offset }).promise;
+        if (state.pdfDoc !== pdf || !wrapper.isConnected ||
+            (modalSelection && (!replaceTextDialog.open || sourceSelection !== selection))) return;
+        const scale = wrapper.pdfViewport.scale;
+        const x = Math.max(0, Math.min(wrapper.pdfViewport.width / scale - box.w, box.x + dx / scale));
+        const y = Math.max(0, Math.min(wrapper.pdfViewport.height / scale - box.h, box.y - dy / scale));
+        applyAreaEdit(selection, { ...box, type: 'image', src: crop.toDataURL('image/png'), x, y }, background);
+        setStatus('Area picked up. Drag it to adjust its placement.');
+    } catch (error) {
+        const message = `Could not pick up the area. ${error.message}`;
+        if (replaceTextDialog.open) replaceError.textContent = message;
+        else setStatus(message);
+    } finally {
+        delete wrapper.dataset.pickingUp;
+    }
+}
+
+function setupAreaSelection(wrapper, overlay) {
+    let start;
+    let marker;
+    function point(event) {
+        const rect = overlay.getBoundingClientRect();
+        return {
+            x: Math.max(0, Math.min(wrapper.pdfViewport.width, event.clientX - rect.left)),
+            y: Math.max(0, Math.min(wrapper.pdfViewport.height, event.clientY - rect.top))
+        };
+    }
+    function bounds(event) {
+        const end = point(event);
+        return { left: Math.min(start.x, end.x), right: Math.max(start.x, end.x),
+            top: Math.min(start.y, end.y), bottom: Math.max(start.y, end.y) };
+    }
+    function reset() {
+        marker?.remove();
+        start = null;
+    }
+    overlay.addEventListener('pointerdown', event => {
+        if (state.tool !== 'area' || event.button !== 0 || !event.isPrimary) return;
+        start = point(event);
+        overlay.setPointerCapture(event.pointerId);
+        marker = document.createElement('div');
+        marker.className = 'area-marker';
+        overlay.append(marker);
+    });
+    overlay.addEventListener('pointermove', event => {
+        if (!start || !event.isPrimary) return;
+        const rect = bounds(event);
+        Object.assign(marker.style, { left: `${rect.left}px`, top: `${rect.top}px`,
+            width: `${rect.right - rect.left}px`, height: `${rect.bottom - rect.top}px` });
+    });
+    overlay.addEventListener('pointerup', event => {
+        if (!start || !event.isPrimary) return;
+        const rect = bounds(event);
+        reset();
+        if (rect.right - rect.left >= 5 && rect.bottom - rect.top >= 5) {
+            requestAnimationFrame(() => {
+                if (wrapper.isConnected && state.tool === 'area') openAreaEditor(areaSelection(wrapper, rect));
+            });
+        }
+    });
+    overlay.addEventListener('pointercancel', reset);
+}
+
 async function addSourceTextTargets(wrapper) {
     if (wrapper.dataset.textTargets) return;
     wrapper.dataset.textTargets = 'loading';
     const pdf = state.pdfDoc;
-    const pageNum = Number(wrapper.dataset.pageNum);
     const viewport = wrapper.pdfViewport;
     const layer = document.createElement('div');
     layer.className = 'source-text-targets';
     try {
-        const page = await pdf.getPage(pageNum);
+        const page = await pdf.getPage(Number(wrapper.dataset.pageNum));
         const { items } = await page.getTextContent();
         if (!wrapper.isConnected || pdf !== state.pdfDoc) return;
         for (const item of items) {
-            if (!item.str?.trim() || item.dir !== 'ltr') continue;
+            if (!item.str?.trim() || item.dir === 'ttb') continue;
             const [a, b, c, d, x, baseline] = pdfjsLib.Util.transform(viewport.transform, item.transform);
             const height = Math.hypot(c, d);
             const width = item.width * viewport.scale;
-            // Cover boxes and movable overlays are axis-aligned in display coordinates.
             if (a <= 0 || Math.abs(b) > a * 0.03 || width <= 0 || height <= 0) continue;
-            const left = Math.max(0, x - 1);
-            const top = Math.max(0, baseline - height);
-            const right = Math.min(viewport.width, x + width + 1);
-            const bottom = Math.min(viewport.height, baseline + Math.max(2, height * 0.28));
-            if (right <= left || bottom <= top) continue;
+            const rect = { left: Math.max(0, x - 1), top: Math.max(0, baseline - height),
+                right: Math.min(viewport.width, x + width + 1),
+                bottom: Math.min(viewport.height, baseline + Math.max(2, height * 0.28)) };
+            if (rect.right <= rect.left || rect.bottom <= rect.top) continue;
+            const selection = areaSelection(wrapper, rect, {
+                x: x / viewport.scale, y: (viewport.height - baseline) / viewport.scale, size: height / viewport.scale
+            });
             const target = document.createElement('button');
             target.type = 'button';
             target.setAttribute('aria-label', `Edit text: ${item.str.trim()}`);
-            target.style.left = `${left}px`;
-            target.style.top = `${top}px`;
-            target.style.width = `${right - left}px`;
-            target.style.height = `${bottom - top}px`;
-            target.addEventListener('click', () => {
-                const scale = viewport.scale;
-                sourceSelection = {
-                    pageNum,
-                    box: { x: left / scale, y: (viewport.height - bottom) / scale, w: (right - left) / scale, h: (bottom - top) / scale },
-                    text: { x: x / scale, y: (viewport.height - baseline) / scale, size: height / scale }
-                };
-                replacementValue.value = item.str.trim();
-                replaceError.textContent = '';
-                replaceTextDialog.showModal();
-                replacementValue.select();
+            Object.assign(target.style, { left: `${rect.left}px`, top: `${rect.top}px`,
+                width: `${rect.right - rect.left}px`, height: `${rect.bottom - rect.top}px` });
+            let start;
+            let moved = false;
+            target.addEventListener('pointerdown', event => {
+                if (event.button !== 0 || !event.isPrimary) return;
+                start = [event.clientX, event.clientY];
+                moved = false;
+                target.setPointerCapture(event.pointerId);
+            });
+            target.addEventListener('pointermove', event => {
+                if (!start || !event.isPrimary) return;
+                const dx = event.clientX - start[0];
+                const dy = event.clientY - start[1];
+                if (Math.hypot(dx, dy) >= 5) moved = true;
+                if (moved) target.style.transform = `translate(${dx}px,${dy}px)`;
+            });
+            target.addEventListener('pointerup', event => {
+                if (!start || !event.isPrimary) return;
+                const [x, y] = start;
+                start = null;
+                target.style.transform = '';
+                if (moved) pickUpSelection(selection, pageBackground(wrapper, rect), event.clientX - x, event.clientY - y);
+            });
+            target.addEventListener('pointercancel', () => {
+                start = null;
+                moved = false;
+                target.style.transform = '';
+            });
+            target.addEventListener('click', event => {
+                if (!moved || event.detail === 0) openAreaEditor(selection, item.str.trim());
+                moved = false;
             });
             layer.append(target);
         }
-        if (!layer.childElementCount) layer.textContent = 'No selectable horizontal text to edit on this page.';
+        if (!layer.childElementCount) layer.textContent = 'Use Move area for scanned, outlined, or angled text on this page.';
         wrapper.append(layer);
         wrapper.dataset.textTargets = 'ready';
     } catch (error) {
-        if (wrapper.isConnected && state.tool === 'replace') setStatus(`Could not read text on page ${pageNum}. ${error.message}`);
+        if (wrapper.isConnected && state.tool === 'replace') setStatus(`Could not read text. Try Move area. ${error.message}`);
         delete wrapper.dataset.textTargets;
     }
 }
 
-document.getElementById('replaceTextForm').addEventListener('submit', async event => {
-    event.preventDefault();
-    const selection = sourceSelection;
-    const { pageNum, box, text } = selection;
-    const value = replacementValue.value.trim();
-    const button = event.currentTarget.querySelector('button[type="submit"]');
-    if (!value || button.disabled) return;
-    const background = replacementBackground.value;
-    const color = propertyInputs.textColor.value;
-    button.disabled = true;
+async function pickUpFromDialog() {
+    if (pickUpArea.disabled || !replaceTextDialog.open) return;
+    pickUpArea.disabled = true;
     try {
-        const checkDocument = await PDFLib.PDFDocument.create();
-        const font = await checkDocument.embedFont(PDFLib.StandardFonts.Helvetica);
-        font.encodeText(value);
-    } catch {
-        replaceError.textContent = 'The export font cannot write one or more of these characters.';
-        return;
+        await pickUpSelection(sourceSelection, replacementBackground.value);
     } finally {
-        button.disabled = false;
+        pickUpArea.disabled = false;
     }
-    if (!replaceTextDialog.open || sourceSelection !== selection) return;
-    const elements = state.elements.get(pageNum) || [];
-    elements.push(
-        { ...box, type: 'shape', color: background, opacity: 1 },
-        { ...text, type: 'text', text: value, color }
-    );
-    state.elements.set(pageNum, elements);
-    state.currentPage = pageNum;
-    updatePageControls();
-    state.tool = 'select';
-    replaceTextDialog.close();
-    updateToolUI();
-    saveHistory();
-    await renderPages();
-    goToPage(pageNum);
-    setStatus('Replacement added. Select and drag the text to move it.');
+}
+
+pickUpArea.addEventListener('click', pickUpFromDialog);
+let pickupTouchStart;
+pickUpArea.addEventListener('pointerdown', event => {
+    if (event.pointerType === 'touch') pickupTouchStart = event;
 });
+pickUpArea.addEventListener('pointercancel', () => { pickupTouchStart = null; });
+pickUpArea.addEventListener('pointerup', event => {
+    const start = pickupTouchStart;
+    pickupTouchStart = null;
+    if (start?.pointerId === event.pointerId && Math.hypot(event.clientX - start.clientX, event.clientY - start.clientY) < 8) {
+        pickUpFromDialog();
+    }
+});
+
+document.getElementById('replaceTextForm').addEventListener('submit', event => {
+    event.preventDefault();
+    if (pickUpArea.disabled) return;
+    const value = replacementValue.value.trim();
+    if (!value) {
+        replaceError.textContent = 'Enter replacement text or choose Pick up area.';
+        return;
+    }
+    applyAreaEdit(sourceSelection, { ...sourceSelection.text, type: 'text', text: value,
+        color: propertyInputs.textColor.value }, replacementBackground.value);
+    setStatus('Replacement added. Drag it to adjust its placement.');
+});
+
+function renderTextImage(element) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const font = `${element.size}px Arial, sans-serif`;
+    ctx.font = font;
+    const metrics = ctx.measureText(element.text);
+    const left = Math.max(0, metrics.actualBoundingBoxLeft);
+    const ascent = Math.max(element.size, metrics.actualBoundingBoxAscent);
+    const descent = Math.max(element.size * 0.3, metrics.actualBoundingBoxDescent);
+    const width = left + Math.max(metrics.width, metrics.actualBoundingBoxRight);
+    const height = ascent + descent;
+    const ratio = Math.min(3, 4096 / Math.max(width, height));
+    canvas.width = Math.max(1, Math.ceil(width * ratio));
+    canvas.height = Math.max(1, Math.ceil(height * ratio));
+    ctx.scale(ratio, ratio);
+    ctx.font = font;
+    ctx.direction = /[\p{Script=Arabic}\p{Script=Hebrew}]/u.test(element.text) ? 'rtl' : 'ltr';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = element.color;
+    ctx.fillText(element.text, left, ascent);
+    return { bytes: canvas.toDataURL('image/png'), width: canvas.width / ratio, height: canvas.height / ratio, descent };
+}

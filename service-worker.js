@@ -1,0 +1,29 @@
+const prefix = 'pro-pdf-editor-';
+const cacheName = prefix + '2026-11-20-1';
+const shell = [
+    './', './index.html', './style.css', './app.js', './organizer.js', './document-tools.js',
+    './versions.js', './install.js', './manifest.webmanifest', './favicon.svg', './icon-192.png', './icon-512.png',
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js'
+].map(path => new URL(path, self.registration.scope).href);
+const cachedAssets = new Set(shell);
+
+self.addEventListener('install', event => {
+    event.waitUntil(caches.open(cacheName).then(cache => cache.addAll(shell)));
+});
+self.addEventListener('activate', event => {
+    event.waitUntil(caches.keys().then(keys => Promise.all(
+        keys.filter(key => key.startsWith(prefix) && key !== cacheName).map(key => caches.delete(key))
+    )).then(() => self.clients.claim()));
+});
+self.addEventListener('fetch', event => {
+    const { request } = event;
+    if (request.method !== 'GET') return;
+    const url = new URL(request.url);
+    if (request.mode === 'navigate' && (url.href === shell[0] || url.href === shell[1])) {
+        event.respondWith(caches.open(cacheName).then(cache => cache.match(shell[1])).then(response => response || fetch(request)));
+    } else if (cachedAssets.has(url.href)) {
+        event.respondWith(caches.open(cacheName).then(cache => cache.match(request.url)).then(response => response || fetch(request)));
+    }
+});

@@ -33,3 +33,13 @@ Choose **Pages**, then enter page numbers and ranges in the order you want. For 
 Use **Versions** to save named checkpoints for a PDF. Reopen the same original file in the same browser to restore a checkpoint. A restore can be undone during the active editing session. Checkpoints are stored locally in browser site data and include your annotations and rotation settings. Download a PDF copy if you need to share or retain it outside that browser.
 
 Open **What’s new** at the bottom of the editor to see recent changes.
+
+## Moving difficult PDF content
+
+With **Edit PDF text**, tap selectable horizontal text to replace it or drag it directly. **Move area** works with scans, outlined or angled text, and artwork. Draw around the area, then choose **Pick up area** to preserve its appearance, or type a replacement. Use a matching cover color on solid backgrounds. Moved areas become images. Replacements use the export font where supported, with an image fallback for additional scripts. The underlying PDF remains under the cover.
+
+## Use on a phone or install on a PC
+
+Open the hosted app in Chrome or Edge, then use **Install app** in the footer or the browser's install menu. The editor runs in its own window and can reopen offline after its files finish caching. On iOS, use **Add to Home Screen** in Safari's Share menu. The mobile layout fits the PDF to the screen on open and has a scrolling touch toolbar. Turn on **Select** to pan the document between edits.
+
+In **Auto-organize**, filter by page, use **Edit** to correct extracted rows, or use **Add row** to transcribe missing text. Report edits appear in the exports and stay in the current report while the PDF is open.
