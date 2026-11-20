@@ -3,6 +3,9 @@ const exportOrder = document.getElementById('exportOrder');
 const pageExportError = document.getElementById('pageExportError');
 const replaceTextDialog = document.getElementById('replaceText');
 const replacementValue = document.getElementById('replacementValue');
+const replacementFont = document.getElementById('replacementFont');
+populateFontPicker(replacementFont);
+replacementFont.addEventListener('change', () => applyTextFont(replacementValue, replacementFont.value));
 const replacementBackground = document.getElementById('replacementBackground');
 const pickUpArea = document.getElementById('pickUpArea');
 const replaceError = document.getElementById('replaceError');
@@ -85,6 +88,8 @@ function areaSelection(wrapper, rect, text) {
 function openAreaEditor(selection, value = '') {
     sourceSelection = selection;
     replacementValue.value = value;
+    replacementFont.value = propertyInputs.textFont.value;
+    applyTextFont(replacementValue, replacementFont.value);
     replacementBackground.value = pageBackground(selection.wrapper, selection.rect);
     replaceError.textContent = '';
     document.getElementById('replaceTextTitle').textContent = value ? 'Edit PDF text' : 'Move or replace area';
@@ -292,14 +297,13 @@ document.getElementById('replaceTextForm').addEventListener('submit', event => {
         return;
     }
     applyAreaEdit(sourceSelection, { ...sourceSelection.text, type: 'text', text: value,
-        color: propertyInputs.textColor.value }, replacementBackground.value);
+        font: replacementFont.value, color: propertyInputs.textColor.value }, replacementBackground.value);
     setStatus('Replacement added. Drag it to adjust its placement.');
 });
 
-function renderTextImage(element) {
+function renderTextImage(element, font = textFontStyle(element.font, element.size)) {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
-    const font = `${element.size}px Arial, sans-serif`;
     ctx.font = font;
     const metrics = ctx.measureText(element.text);
     const left = Math.max(0, metrics.actualBoundingBoxLeft);

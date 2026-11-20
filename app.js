@@ -36,6 +36,7 @@ const selectionStatus = document.getElementById('selectionStatus');
 const loaderText = document.getElementById('loaderText');
 const propertyInputs = {
     fontSize: document.getElementById('fontSize'),
+    textFont: document.getElementById('textFont'),
     textColor: document.getElementById('textColor'),
     shapeColor: document.getElementById('shapeColor'),
     opacity: document.getElementById('opacity')
@@ -53,6 +54,7 @@ function updatePageControls() {
     btnClearPage.disabled = !total;
     document.getElementById("btnOrganize").disabled = !total;
     document.getElementById("btnPages").disabled = !total;
+    document.getElementById("btnSignature").disabled = !total;
     document.getElementById("btnVersions").disabled = !total;
     document.getElementById('btnPrevPage').disabled = !total || state.currentPage <= 1;
     document.getElementById('btnNextPage').disabled = !total || state.currentPage >= total;
@@ -75,6 +77,7 @@ function setSelection(element) {
         btnDelete.disabled = false;
         if (selectionStatus) selectionStatus.textContent = `${element.elData.type} selected`;
         if (element.elData.type === 'text') {
+            propertyInputs.textFont.value = textFontKey(element.elData.font);
             propertyInputs.fontSize.value = element.elData.size || 12;
             propertyInputs.textColor.value = element.elData.color || '#000000';
         }
@@ -92,6 +95,14 @@ function updateSelectedProperty(name, value) {
     const selected = state.selectedEl;
     if (!selected || !selected.stateData) return;
     const data = selected.stateData;
+    if (name === 'textFont' && data.type === 'text') {
+        data.font = textFontKey(value);
+        selected.elData.font = data.font;
+        applyTextFont(selected, data.font);
+        saveHistory();
+        setStatus('Font updated');
+        return;
+    }
     if (name === 'fontSize' && data.type === 'text') data.size = Math.max(6, Math.min(72, Number(value) || 12));
     if (name === 'textColor' && data.type === 'text') data.color = value;
     if (name === 'shapeColor' && data.type === 'shape') data.color = value;
@@ -107,6 +118,7 @@ Object.entries(propertyInputs).forEach(([name, input]) => {
 
 // --- Initialization ---
 function init() {
+    populateFontPicker(propertyInputs.textFont);
     updatePageControls();
     updateToolUI();
     const properties = document.getElementById('btnProperties');
@@ -158,6 +170,7 @@ async function openPDF(file) {
         state.originalBytes = bytes;
         state.fileName = file.name;
         state.pdfDoc = documentToOpen;
+        if (state.tool === 'signature') state.tool = 'select';
         state.elements.clear();
         state.pageViewports.clear();
         state.history = [];
@@ -238,6 +251,9 @@ async function renderPages() {
             updatePageControls();
         });
         setupOverlayEvents(overlay, i, viewport);
+        overlay.addEventListener('click', event => {
+            if (state.tool === 'signature') placeSignature(event, wrapper);
+        });
         setupAreaSelection(wrapper, overlay);
         if (state.tool === "replace") addSourceTextTargets(wrapper);
         if (renderVersion !== state.renderVersion) return;
@@ -258,11 +274,12 @@ function updateToolUI() {
     if (state.tool === 'replace') {
         document.querySelectorAll('.page-wrapper').forEach(addSourceTextTargets);
     }
-    const names = { replace: 'Tap existing text to edit it, or drag it to move it', area: 'Draw a box around content to pick it up or replace it', select: matchMedia('(pointer: coarse)').matches ? 'Select, pan, or pinch to zoom' : 'Select and move', text: 'Click anywhere to type', whiteout: 'Drag to cover content', highlight: 'Drag to highlight', rectangle: 'Drag to add a rectangle', draw: 'Draw or sign' };
+    const names = { signature: 'Tap or click where you want the signature', replace: 'Tap existing text to edit it, or drag it to move it', area: 'Draw a box around content to pick it up or replace it', select: matchMedia('(pointer: coarse)').matches ? 'Select, pan, or pinch to zoom' : 'Select and move', text: 'Click anywhere to type', whiteout: 'Drag to cover content', highlight: 'Drag to highlight', rectangle: 'Drag to add a rectangle', draw: 'Draw or sign' };
     setStatus(state.pdfDoc ? names[state.tool] : 'Ready — open a PDF to begin');
 }
 
 toolBtns.forEach(btn => {
+    if (btn.dataset.tool === 'signature') return;
     btn.addEventListener('click', () => {
         state.tool = btn.dataset.tool;
         setSelection(null);
@@ -278,7 +295,7 @@ function setupOverlayEvents(overlay, pageNum, viewport) {
 
     // Click to deselect
     overlay.addEventListener('pointerdown', (e) => {
-        if (e.target !== overlay || state.tool === 'area') return; // Ignore clicks on elements
+        if (e.target !== overlay || state.tool === 'area' || state.tool === 'signature') return; // Ignore clicks on elements
 
         if (overlay.setPointerCapture) overlay.setPointerCapture(e.pointerId);
 
@@ -405,7 +422,7 @@ function createTextElement(x, y, pageNum, viewport, container) {
     input.style.left = x + 'px';
     input.style.top = y + 'px';
     input.style.fontSize = (size * scale) + 'px';
-    input.style.fontFamily = 'Arial, sans-serif';
+    applyTextFont(input, propertyInputs.textFont.value);
     input.style.border = '2px solid #3b82f6';
     input.style.borderRadius = '5px';
     input.style.background = '#ffffff';
@@ -430,6 +447,7 @@ function createTextElement(x, y, pageNum, viewport, container) {
                 x: x / scale,
                 y: (viewport.height - y) / scale - size, // Adjust for text baseline
                 size: size,
+                font: propertyInputs.textFont.value,
                 color: document.getElementById('textColor').value
             };
             saveState(newElData, pageNum, container, viewport);
@@ -463,6 +481,7 @@ function editTextElement(element) {
     input.style.left = element.style.left;
     input.style.top = element.style.top;
     input.style.fontSize = element.style.fontSize;
+    applyTextFont(input, data.font);
     input.style.color = data.color || '#000000';
     input.style.width = `${Math.max(element.offsetWidth + 32, 150)}px`;
     element.parentElement.appendChild(input);
@@ -498,6 +517,7 @@ function createDOMElement(elData, container, pageNum, viewport) {
         div.classList.add('el-text');
         div.textContent = elData.text;
         div.dir = 'auto';
+        applyTextFont(div, elData.font);
         div.style.left = (elData.x * scale) + 'px';
         div.style.top = (viewport.height - (elData.y * scale) - (elData.size * scale)) + 'px';
         div.style.fontSize = (elData.size * scale) + 'px';
@@ -620,8 +640,15 @@ function setupGlobalDrag() {
             dragTarget.style.left = (elStartX + dx) + 'px';
             dragTarget.style.top = (elStartY + dy) + 'px';
         } else if (dragType === 'resize') {
-            dragTarget.style.width = Math.max(20, elStartW + dx) + 'px';
-            dragTarget.style.height = Math.max(20, elStartH + dy) + 'px';
+            if (dragTarget.elData.signature) {
+                const adjustment = (dx * elStartW + dy * elStartH) / (elStartW ** 2 + elStartH ** 2);
+                const ratio = Math.max(20 / elStartW, 1 + adjustment);
+                dragTarget.style.width = `${elStartW * ratio}px`;
+                dragTarget.style.height = `${elStartH * ratio}px`;
+            } else {
+                dragTarget.style.width = Math.max(20, elStartW + dx) + 'px';
+                dragTarget.style.height = Math.max(20, elStartH + dy) + 'px';
+            }
         }
     });
 
@@ -842,7 +869,13 @@ window.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
     if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redo(); }
     if (e.key === 'Delete' || e.key === 'Backspace') { if (state.selectedEl) btnDelete.click(); }
-    if (e.key === 'Escape') setSelection(null);
+    if (e.key === 'Escape') {
+        if (state.tool === 'signature') {
+            state.tool = 'select';
+            updateToolUI();
+        }
+        setSelection(null);
+    }
     const shortcuts = { m: 'area', e: 'replace', v: 'select', t: 'text', r: 'whiteout', h: 'highlight', b: 'rectangle', d: 'draw' };
     const tool = shortcuts[e.key.toLowerCase()];
     if (tool) { state.tool = tool; updateToolUI(); }
@@ -948,11 +981,10 @@ async function savePDF(pageOrder) {
     loaderText.textContent = 'Building your edited PDF…';
 
     try {
-        const { PDFDocument, rgb, StandardFonts, degrees } = PDFLib;
+        const { PDFDocument, rgb, degrees } = PDFLib;
         const pdfDoc = await PDFDocument.load(state.originalBytes);
         const pages = pdfDoc.getPages();
-        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-        const supportedCharacters = new Set(font.getCharacterSet());
+        const embeddedFonts = new Map();
 
         for (const i of pageOrder || pages.map((_, index) => index + 1)) {
             const page = pages[i - 1];
@@ -985,6 +1017,12 @@ async function savePDF(pageOrder) {
                     const g = parseInt(hex.substring(2, 4), 16) / 255;
                     const b = parseInt(hex.substring(4, 6), 16) / 255;
 
+                    const key = textFontKey(el.font);
+                    if (!embeddedFonts.has(key)) {
+                        const font = await pdfDoc.embedFont(TEXT_FONTS[key].pdf);
+                        embeddedFonts.set(key, { font, supportedCharacters: new Set(font.getCharacterSet()) });
+                    }
+                    const { font, supportedCharacters } = embeddedFonts.get(key);
                     const supported = [...el.text].every(character => supportedCharacters.has(character.codePointAt(0)));
                     if (supported) {
                         page.drawText(el.text, {

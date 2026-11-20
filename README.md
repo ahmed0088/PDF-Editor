@@ -43,3 +43,9 @@ With **Edit PDF text**, tap selectable horizontal text to replace it or drag it 
 Open the hosted app in Chrome or Edge, then use **Install app** in the footer or the browser's install menu. The editor runs in its own window and can reopen offline after its files finish caching. On iOS, use **Add to Home Screen** in Safari's Share menu. The mobile layout fits the PDF to the screen on open and has a scrolling touch toolbar. Use **Select** to pan the document or pinch with two fingers to zoom.
 
 In **Auto-organize**, filter by page, use **Edit** to correct extracted rows, or use **Add row** to transcribe missing text. Report edits appear in the exports and stay in the current report while the PDF is open.
+
+## Fonts and signatures
+
+Choose Helvetica, Times, or Courier, with regular, bold, and italic styles, in **Properties** or the replacement dialog. Available characters remain selectable in the exported PDF. Other characters use the image fallback.
+
+Open **Sign** to type your name or draw with a mouse, finger, or stylus. Choose **Place signature**, then click or tap the PDF. The signature is a movable, resizable visual mark and is included in the exported document.

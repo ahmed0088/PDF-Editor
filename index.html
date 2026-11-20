@@ -64,7 +64,8 @@
             <button class="tool-btn" data-tool="whiteout" title="Cover visually; underlying content remains (R)"><span>□</span><small>Cover</small></button>
             <button class="tool-btn" data-tool="highlight" title="Highlight (H)"><span>▰</span><small>Mark</small></button>
             <button class="tool-btn" data-tool="rectangle" title="Add rectangle (B)"><span>▭</span><small>Shape</small></button>
-            <button class="tool-btn" data-tool="draw" title="Draw / sign (D)"><span>✎</span><small>Draw</small></button>
+            <button class="tool-btn" data-tool="draw" title="Draw (D)"><span>✎</span><small>Draw</small></button>
+            <button id="btnSignature" class="tool-btn" data-tool="signature" title="Add a signature" disabled><span>✒</span><small>Sign</small></button>
             <label class="tool-btn" for="imageInput" title="Insert image"><span>▧</span><small>Image</small></label>
             <input type="file" id="imageInput" accept="image/png, image/jpeg" style="display:none;">
         </aside>
@@ -84,10 +85,12 @@
             <div class="panel-heading"><div><h3>Properties</h3></div><span id="selectionStatus">Nothing selected</span></div>
 
             <div class="prop-group" id="prop-text">
-                <label>Font Size</label>
+                <label for="textFont">Font</label>
+                <select id="textFont"></select>
+                <label for="fontSize">Font size</label>
                 <input type="number" id="fontSize" value="12" min="6" max="72">
 
-                <label>Text Color</label>
+                <label for="textColor">Text color</label>
                 <input type="color" id="textColor" value="#000000">
             </div>
 
@@ -207,10 +210,32 @@
                 <button type="button" class="btn" data-close>Close</button>
             </header>
             <label>Replacement text<input id="replacementValue" type="text" dir="auto"></label>
+            <label>Font<select id="replacementFont"></select></label>
             <label>Background color<input id="replacementBackground" type="color" value="#ffffff"></label>
             <p>Pick up the area to keep its appearance, or type a replacement. The original content stays under the cover.</p>
             <div class="dialog-actions"><button type="button" id="pickUpArea" class="btn">Pick up area</button><button type="submit" class="btn primary">Apply replacement</button></div>
             <p id="replaceError" role="alert"></p>
+        </form>
+    </dialog>
+    <dialog id="signatureDialog" class="compact-dialog" aria-labelledby="signatureTitle">
+        <form id="signatureForm">
+            <header class="organizer-header"><h2 id="signatureTitle">Add a signature</h2>
+                <button type="button" id="signatureClose" class="btn">Close</button>
+            </header>
+            <fieldset class="signature-mode" aria-label="Signature method">
+                <label><input type="radio" name="signatureMode" value="type" checked><span>Type</span></label>
+                <label><input type="radio" name="signatureMode" value="draw"><span>Draw</span></label>
+            </fieldset>
+            <div id="typedSignature">
+                <label>Full name<input id="signatureName" type="text" maxlength="80" autocomplete="name" dir="auto"></label>
+                <div id="signaturePreview" dir="auto" aria-hidden="true"></div>
+            </div>
+            <div id="drawnSignature" hidden>
+                <canvas id="signatureCanvas" width="900" height="300" aria-label="Draw your signature with a mouse, finger, or stylus"></canvas>
+                <button type="button" id="signatureClear" class="btn">Clear drawing</button>
+            </div>
+            <div class="dialog-actions signature-actions"><button id="signaturePlace" type="submit" class="btn primary" disabled>Place signature</button></div>
+            <p id="signatureStatus" role="status"></p>
         </form>
     </dialog>
     <dialog id="versions" class="compact-dialog" aria-labelledby="versionsTitle">
@@ -230,6 +255,7 @@
             <form method="dialog"><button class="btn">Close</button></form>
         </header>
         <ul class="release-notes">
+            <li><strong>Fonts and signatures</strong> Choose a font for text, or place a typed or hand-drawn signature.</li>
             <li><strong>Move PDF content</strong> Drag selectable text or pick up a page area, including artwork and scanned text.</li>
             <li><strong>Mobile and desktop</strong> Pinch to zoom in Select mode on phones, or install the editor as a web app.</li>
             <li><strong>Versions</strong> Save named checkpoints and restore them in the same browser.</li>
@@ -250,10 +276,12 @@
         </ol>
     </dialog>
     <section id="printReport" aria-label="Organized PDF report"></section>
+    <script src="fonts.js"></script>
     <script src="app.js"></script>
     <script src="organizer.js"></script>
     <script src="document-tools.js"></script>
     <script src="versions.js"></script>
     <script src="install.js"></script>
+    <script src="signature.js"></script>
 </body>
 </html>

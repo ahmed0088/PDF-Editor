@@ -1,8 +1,8 @@
 const prefix = 'pro-pdf-editor-';
-const cacheName = prefix + '2026-11-20-4';
+const cacheName = prefix + '2026-11-20-5';
 const shell = [
     './', './index.html', './style.css', './app.js', './organizer.js', './document-tools.js',
-    './versions.js', './install.js', './manifest.webmanifest', './favicon.svg', './icon-192.png', './icon-512.png',
+    './versions.js', './install.js', './fonts.js', './signature.js', './allura-latin.woff2', './manifest.webmanifest', './favicon.svg', './icon-192.png', './icon-512.png',
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js'
