@@ -1,5 +1,5 @@
 const prefix = 'pro-pdf-editor-';
-const cacheName = prefix + '2026-11-20-3';
+const cacheName = prefix + '2026-11-20-4';
 const shell = [
     './', './index.html', './style.css', './app.js', './organizer.js', './document-tools.js',
     './versions.js', './install.js', './manifest.webmanifest', './favicon.svg', './icon-192.png', './icon-512.png',

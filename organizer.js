@@ -143,6 +143,13 @@ function createReportRows(rows, clickable) {
         cell.dir = 'auto';
         cell.textContent = row.text;
         if (clickable) {
+            if (row.date) {
+                const date = document.createElement('time');
+                date.className = 'report-row-date';
+                date.dateTime = row.date;
+                date.textContent = row.date;
+                cell.prepend(date);
+            }
             const edit = document.createElement('button');
             edit.type = 'button';
             edit.className = 'source-page edit-report-row';

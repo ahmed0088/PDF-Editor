@@ -347,6 +347,7 @@ button, label { user-select: none; }
 .report-status #organizerStatus { margin: 0; }
 .report-status .btn { flex: none; }
 .edit-report-row { margin-inline-start: 8px; }
+.report-row-date { display: none; }
 #resetReportRow[hidden] { display: none; }
 .compact-dialog textarea { width: 100%; resize: vertical; padding: 8px; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 7px; font: inherit; }
 @media (max-width: 620px) {
@@ -370,4 +371,7 @@ button, label { user-select: none; }
 
 @media (max-width: 380px) {
     .organizer-controls label:last-child { grid-column: 1 / -1; }
+    #organizer :is(th, td):nth-child(3) { display: none; }
+    .report-row-date { display: block; margin-bottom: 3px; color: var(--report-muted); font-size: .74rem; }
+
 }
