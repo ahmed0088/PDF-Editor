@@ -2,6 +2,8 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 
 const state = {
     originalBytes: null,
+    fileName: "",
+    pageViewports: new Map(),
     pdfDoc: null,
     scale: 1.5,
     tool: 'select',
@@ -49,6 +51,7 @@ function updatePageControls() {
     pageNumber.max = total || 1;
     pageNumber.value = total ? state.currentPage : 1;
     btnClearPage.disabled = !total;
+    document.getElementById("btnOrganize").disabled = !total;
     document.getElementById('btnPrevPage').disabled = !total || state.currentPage <= 1;
     document.getElementById('btnNextPage').disabled = !total || state.currentPage >= total;
 }
@@ -104,22 +107,57 @@ Object.entries(propertyInputs).forEach(([name, input]) => {
 function init() {
     updatePageControls();
     updateToolUI();
+    const properties = document.getElementById('btnProperties');
+    properties.addEventListener('click', () => {
+        const open = properties.getAttribute('aria-expanded') !== 'true';
+        properties.setAttribute('aria-expanded', String(open));
+        document.getElementById('properties-sidebar').classList.toggle('show-properties', open);
+    });
 }
 
 // --- Loading & Rendering ---
-fileInput.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+document.getElementById('btnOpen').addEventListener('click', () => fileInput.click());
+document.getElementById('btnChoose').addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => {
+    const file = fileInput.files[0];
+    fileInput.value = '';
+    if (file) openPDF(file);
+});
+
+const dropZone = document.getElementById('viewer-container');
+dropZone.addEventListener('dragover', event => {
+    if (!event.dataTransfer.types.includes('Files')) return;
+    event.preventDefault();
+    dropZone.classList.add('drop-target');
+});
+dropZone.addEventListener('dragleave', event => {
+    if (!dropZone.contains(event.relatedTarget)) dropZone.classList.remove('drop-target');
+});
+dropZone.addEventListener('drop', event => {
+    event.preventDefault();
+    dropZone.classList.remove('drop-target');
+    const file = event.dataTransfer.files[0];
+    if (file) openPDF(file);
+});
+
+async function openPDF(file) {
+    if (!loader.classList.contains('hidden')) return;
+    loaderText.textContent = 'Opening PDF…';
     loader.classList.remove('hidden');
-
+    let loadingTask;
     try {
-        const buffer = await file.arrayBuffer();
-        state.originalBytes = buffer.slice(0);
-
-        const loadingTask = pdfjsLib.getDocument({ data: buffer });
-        state.pdfDoc = await loadingTask.promise;
-
+        const bytes = await file.arrayBuffer();
+        loadingTask = pdfjsLib.getDocument({ data: bytes.slice(0), isEvalSupported: false });
+        const documentToOpen = await loadingTask.promise;
+        if (state.pdfDoc) {
+            state.renderVersion++;
+            await state.pdfDoc.destroy();
+        }
+        state.originalBytes = bytes;
+        state.fileName = file.name;
+        state.pdfDoc = documentToOpen;
         state.elements.clear();
+        state.pageViewports.clear();
         state.history = [];
         state.historyIndex = -1;
         state.currentPage = 1;
@@ -128,24 +166,44 @@ fileInput.addEventListener('change', async (e) => {
         btnSave.disabled = false;
         viewer.classList.remove('empty-state');
         updatePageControls();
-        setStatus(`${file.name} loaded · ${state.pdfDoc.numPages} page${state.pdfDoc.numPages === 1 ? '' : 's'}`);
         await renderPages();
-
-    } catch (err) {
-        setStatus('Could not open that PDF');
-        alert("Error loading PDF: " + err.message);
+        setStatus(`${file.name} loaded · ${state.pdfDoc.numPages} page${state.pdfDoc.numPages === 1 ? '' : 's'}`);
+    } catch (error) {
+        if (loadingTask && state.pdfDoc?.loadingTask !== loadingTask) {
+            await loadingTask.destroy().catch(() => {});
+        }
+        setStatus(`Could not open ${file.name}. ${error.message}`);
     } finally {
         loader.classList.add('hidden');
     }
-});
+}
+
+function fileStem() {
+    return state.fileName.replace(/\.pdf$/i, '') || 'document';
+}
+
+function downloadBlob(blob, name) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
 
 async function renderPages() {
-    viewer.innerHTML = '';
     if (!state.pdfDoc) return;
+    setSelection(null);
+    dragTarget = null;
+    viewer.replaceChildren();
     const renderVersion = ++state.renderVersion;
 
     for (let i = 1; i <= state.pdfDoc.numPages; i++) {
         const page = await state.pdfDoc.getPage(i);
+        if (renderVersion !== state.renderVersion) return;
+        state.pageViewports.set(i, page.getViewport({ scale: 1 }));
         const viewport = page.getViewport({ scale: state.scale });
 
         const wrapper = document.createElement('div');
@@ -159,6 +217,7 @@ async function renderPages() {
         canvas.height = viewport.height;
         const ctx = canvas.getContext('2d');
         await page.render({ canvasContext: ctx, viewport }).promise;
+        if (renderVersion !== state.renderVersion) return;
         wrapper.appendChild(canvas);
 
         const overlay = document.createElement('div');
@@ -490,11 +549,9 @@ function createDOMElement(elData, container, pageNum, viewport) {
 
         setSelection(div);
 
-        // Determine if resizing (bottom right corner)
-        const rect = div.getBoundingClientRect();
-        const isResize = (e.clientX > rect.right - 20) && (e.clientY > rect.bottom - 20);
-
-        startElementDrag(e, div, isResize, viewport, pageNum);
+        state.currentPage = pageNum;
+        updatePageControls();
+        startElementDrag(e, div, e.target.classList.contains('resize-handle'));
     });
 
     if (elData.type === 'text') {
@@ -515,7 +572,7 @@ let dragStartX = 0, dragStartY = 0;
 let elStartX = 0, elStartY = 0, elStartW = 0, elStartH = 0;
 let globalDragReady = false;
 
-function startElementDrag(e, el, isResize, viewport, pageNum) {
+function startElementDrag(e, el, isResize) {
     dragTarget = el;
     dragType = isResize ? 'resize' : 'move';
     dragStartX = e.clientX;
@@ -548,6 +605,13 @@ function setupGlobalDrag() {
 
     window.addEventListener('pointerup', () => {
         if (!dragTarget) return;
+        if (!dragTarget.isConnected ||
+            (parseFloat(dragTarget.style.left) === elStartX && parseFloat(dragTarget.style.top) === elStartY &&
+                (parseFloat(dragTarget.style.width) || 0) === elStartW &&
+                (parseFloat(dragTarget.style.height) || 0) === elStartH)) {
+            dragTarget = null;
+            return;
+        }
 
         const container = dragTarget.parentElement;
         const pageNum = parseInt(container.dataset.pageNum);
@@ -646,13 +710,14 @@ imageInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
+    const pdf = state.pdfDoc;
+    const pageNumberToEdit = state.currentPage;
     const reader = new FileReader();
     reader.onload = (event) => {
         const img = new Image();
         img.onload = () => {
-            // Default to placing on page 1 if available
-            if (state.pdfDoc && state.pdfDoc.numPages > 0) {
-                const wrapper = document.querySelector('.page-wrapper[data-page-num="1"]');
+            if (state.pdfDoc === pdf && pdf) {
+                const wrapper = document.querySelector(`.page-wrapper[data-page-num="${pageNumberToEdit}"]`);
                 if (!wrapper) return;
 
                 const scale = state.scale;
@@ -677,7 +742,7 @@ imageInput.addEventListener('change', (e) => {
                     h: h
                 };
 
-                saveState(newElData, 1, wrapper, { height: wrapper.clientHeight });
+                saveState(newElData, pageNumberToEdit, wrapper, { height: wrapper.clientHeight });
             }
         };
         img.src = event.target.result;
@@ -736,7 +801,8 @@ btnDelete.addEventListener('click', () => {
 });
 
 window.addEventListener('keydown', (e) => {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (!loader.classList.contains('hidden') || document.getElementById('organizer').open ||
+        e.target.closest?.('input, textarea, select, [contenteditable]')) return;
     if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
     if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { e.preventDefault(); redo(); }
     if (e.key === 'Delete' || e.key === 'Backspace') { if (state.selectedEl) btnDelete.click(); }
@@ -769,7 +835,14 @@ btnSave.addEventListener('click', async () => {
         for (let i = 1; i <= pages.length; i++) {
             const page = pages[i - 1];
             const rotation = state.pageRotations.get(i);
-            if (rotation !== undefined) page.setRotation(degrees(rotation));
+            const originalRotation = page.getRotation().angle;
+            const viewport = state.pageViewports.get(i);
+            const angle = degrees(viewport?.rotation || 0);
+            function pdfPoint(x, y) {
+                const [pdfX, pdfY] = viewport.convertToPdfPoint(x, viewport.height - y);
+                return { x: pdfX, y: pdfY };
+            }
+            if (rotation !== undefined) page.setRotation(degrees((originalRotation + rotation) % 360));
             const els = state.elements.get(i) || [];
 
             for (const el of els) {
@@ -780,7 +853,7 @@ btnSave.addEventListener('click', async () => {
                     const b = parseInt(hex.substring(4, 6), 16) / 255;
 
                     page.drawRectangle({
-                        x: el.x, y: el.y, width: el.w, height: el.h,
+                        ...pdfPoint(el.x, el.y), width: el.w, height: el.h, rotate: angle,
                         color: rgb(r, g, b), opacity: el.opacity, borderWidth: 0
                     });
                 }
@@ -791,7 +864,7 @@ btnSave.addEventListener('click', async () => {
                     const b = parseInt(hex.substring(4, 6), 16) / 255;
 
                     page.drawText(el.text, {
-                        x: el.x, y: el.y, size: el.size, font: font, color: rgb(r, g, b)
+                        ...pdfPoint(el.x, el.y), size: el.size, rotate: angle, font, color: rgb(r, g, b)
                     });
                 }
                 else if (el.type === 'image') {
@@ -807,7 +880,7 @@ btnSave.addEventListener('click', async () => {
                     } else {
                         img = await pdfDoc.embedJpg(bytes);
                     }
-                    page.drawImage(img, { x: el.x, y: el.y, width: el.w, height: el.h });
+                    page.drawImage(img, { ...pdfPoint(el.x, el.y), width: el.w, height: el.h, rotate: angle });
                 }
                 else if (el.type === 'draw') {
                     const hex = el.color.replace('#', '');
@@ -817,8 +890,8 @@ btnSave.addEventListener('click', async () => {
 
                     for (let j = 1; j < el.path.length; j++) {
                         page.drawLine({
-                            start: { x: el.path[j-1].x, y: el.path[j-1].y },
-                            end: { x: el.path[j].x, y: el.path[j].y },
+                            start: pdfPoint(el.path[j - 1].x, el.path[j - 1].y),
+                            end: pdfPoint(el.path[j].x, el.path[j].y),
                             thickness: el.thickness,
                             color: rgb(r, g, b)
                         });
@@ -828,19 +901,11 @@ btnSave.addEventListener('click', async () => {
         }
 
         const finalBytes = await pdfDoc.save();
-        const blob = new Blob([finalBytes], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'Edited_Document.pdf';
-        a.click();
-        URL.revokeObjectURL(url);
+        downloadBlob(new Blob([finalBytes], { type: 'application/pdf' }), `${fileStem()}-edited.pdf`);
         setStatus('PDF downloaded successfully');
 
     } catch (err) {
-        setStatus('Could not save the PDF');
-        alert("Error saving: " + err.message);
+        setStatus(`Could not save the PDF. ${err.message}`);
     } finally {
         loader.classList.add('hidden');
     }

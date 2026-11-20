@@ -1,68 +1,19 @@
-\# 🛡️ Pro PDF Editor (Web-Based)
+# Pro PDF Editor
 
+Open, annotate, and organize PDFs in your browser. PDF.js renders pages and extracts text. PDF-lib writes annotations and page rotations into the downloaded PDF.
 
+## Run the web app
 
-A fully client-side, professional-grade PDF editor built with vanilla JavaScript, `pdf.js`, and `pdf-lib`. No servers, no uploads, 100% privacy.
+From this directory, run `python -m http.server 8000` and open `http://localhost:8000` in a modern browser. This source version loads its pinned PDF libraries from a CDN. Documents are processed in the browser.
 
+## Edit a PDF
 
+Open or drop a PDF, then add text, shapes, highlights, drawings, or images. Use the Properties panel to adjust settings and Undo or Redo to revisit edits. Page rotation takes effect in the exported PDF. **Save PDF** downloads a copy with the edits.
 
-\## ✨ Features
+The Cover tool creates a visual overlay. The underlying content remains in the PDF.
 
-\- \*\*Click-to-Type Text\*\*: Click anywhere on the document to add text instantly.
+## Auto-organize
 
-\- \*\*Infinite Drag \& Drop\*\*: Smoothly move text, shapes, and images anywhere.
+Open a PDF and choose **Auto-organize**. Use **Reading order** for prose or **Align table rows** to group text at the same visual height. Search and sort the report, then uncheck rows you want to omit. Click a page number to inspect the source. **Export CSV** and **Print / Save PDF** include the filtered, checked rows in the selected order.
 
-\- \*\*Whiteout / Redact\*\*: Cover sensitive information with solid boxes.
-
-\- \*\*Highlighter\*\*: Add semi-transparent highlights to existing text.
-
-\- \*\*Freehand Drawing\*\*: Sign documents or draw directly on the PDF.
-
-\- \*\*Insert Images\*\*: Add logos, stamps, or photos.
-
-\- \*\*History System\*\*: Full Undo (`Ctrl+Z`) and Redo (`Ctrl+Y`) support.
-
-\- \*\*Zooming\*\*: `Alt +` / `Alt -` for precision editing.
-
-\- \*\*Export\*\*: Permanently applies all edits and downloads a clean, valid PDF.
-
-
-
-\## 🚀 How to Run Locally
-
-
-
-Because browsers block certain features (like Web Workers) when opening files directly, you must run a local server.
-
-
-
-1\. Download the four files (`index.html`, `style.css`, `app.js`, `README.md`).
-
-2\. Open your terminal/command prompt in that folder.
-
-3\. Run one of the following commands:
-
-&#x20;  - \*\*Python 3\*\*: `python -m http.server 8000`
-
-&#x20;  - \*\*Node.js\*\*: `npx serve`
-
-4\. Open `http://localhost:8000` in Chrome, Edge, or Firefox.
-
-
-
-\## 🛠️ Tech Stack
-
-\- \[PDF.js](https://mozilla.github.io/pdf.js/) for high-fidelity rendering.
-
-\- \[PDF-lib](https://pdf-lib.js.org/) for modifying and saving PDF bytes.
-
-\- Vanilla HTML/CSS/JS (No dependencies, no build tools required).
-
-
-
-\## 📝 Note on "Native Text Editing"
-
-Due to the complex nature of PDF architecture (which stamps text at specific X/Y coordinates), true "text reflow" (deleting a word and having the next word move left) is impossible in pure frontend JS. 
-
-This editor uses the industry-standard \*\*Overlay Method\*\* (used by many web editors). You cover the old text and type new text over it.
-
+Numeric date detection defaults to unambiguous dates. Set a date format for ambiguous dates such as 04/05/26. Two-digit years are interpreted as 2000–2099. Check complex tables and columns against the source. Image-only pages require OCR before import.

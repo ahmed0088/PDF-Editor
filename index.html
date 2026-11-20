@@ -16,7 +16,7 @@
     <!-- Top Toolbar -->
     <header id="top-toolbar">
         <div class="brand"><span class="brand-mark">✦</span><span>Pro PDF Editor</span></div>
-        <label class="btn primary" for="fileInput">Open PDF</label>
+        <button class="btn primary" id="btnOpen">Open PDF</button>
         <input type="file" id="fileInput" accept="application/pdf">
 
         <div class="divider"></div>
@@ -43,6 +43,8 @@
             <button id="btnZoomIn" class="btn icon" title="Zoom in">+</button>
         </div>
 
+        <button id="btnProperties" class="btn" aria-expanded="false" aria-controls="properties-sidebar">Properties</button>
+        <button id="btnOrganize" class="btn organize" disabled>Auto-organize</button>
         <button id="btnSave" class="btn success" disabled>Save PDF</button>
     </header>
 
@@ -52,7 +54,7 @@
         <aside id="tool-sidebar">
             <button class="tool-btn active" data-tool="select" title="Select and move (V)"><span>↖</span><small>Select</small></button>
             <button class="tool-btn" data-tool="text" title="Add text (T)"><span>T</span><small>Text</small></button>
-            <button class="tool-btn" data-tool="whiteout" title="Whiteout / redact (R)"><span>□</span><small>Cover</small></button>
+            <button class="tool-btn" data-tool="whiteout" title="Cover visually; underlying content remains (R)"><span>□</span><small>Cover</small></button>
             <button class="tool-btn" data-tool="highlight" title="Highlight (H)"><span>▰</span><small>Mark</small></button>
             <button class="tool-btn" data-tool="rectangle" title="Add rectangle (B)"><span>▭</span><small>Shape</small></button>
             <button class="tool-btn" data-tool="draw" title="Draw / sign (D)"><span>✎</span><small>Draw</small></button>
@@ -66,13 +68,13 @@
                 <div class="empty-icon">✦</div>
                 <h2>Drop a PDF here to start</h2>
                 <p>Open a document, then choose a tool to edit it privately in your browser.</p>
-                <label class="btn primary empty-action" for="fileInput">Choose PDF</label>
+                <button class="btn primary empty-action" id="btnChoose">Choose PDF</button>
             </div>
         </section>
 
         <!-- Right Sidebar: Properties -->
         <aside id="properties-sidebar">
-            <div class="panel-heading"><div><span class="eyebrow">Inspector</span><h3>Properties</h3></div><span id="selectionStatus">Nothing selected</span></div>
+            <div class="panel-heading"><div><h3>Properties</h3></div><span id="selectionStatus">Nothing selected</span></div>
 
             <div class="prop-group" id="prop-text">
                 <label>Font Size</label>
@@ -103,7 +105,7 @@
         </aside>
     </main>
 
-    <footer id="statusbar"><span id="statusText">Ready — open a PDF to begin</span><span class="shortcut-hint">V select · T text · R cover · H highlight · B shape · D draw · Delete remove</span></footer>
+    <footer id="statusbar"><span id="statusText" role="status">Ready — open a PDF to begin</span><span class="shortcut-hint">V select · T text · R cover · H highlight · B shape · D draw · Delete remove</span></footer>
 
     <!-- Loader -->
     <div id="loader" class="hidden">
@@ -111,6 +113,51 @@
         <p id="loaderText">Processing...</p>
     </div>
 
+    <dialog id="organizer" aria-labelledby="organizerTitle">
+        <header class="organizer-header">
+            <div>
+                <h2 id="organizerTitle">Auto-organize</h2>
+                <p id="organizerFile"></p>
+            </div>
+            <form method="dialog"><button class="btn" aria-label="Close organizer">Close</button></form>
+        </header>
+        <p class="organizer-help">Extract text into a searchable report with the original page references. Check the reading order on tables and multi-column pages before exporting.</p>
+        <div class="organizer-controls">
+            <label>Search text<input id="organizerSearch" type="search" placeholder="Filter rows"></label>
+            <label>Layout<select id="organizerLayout">
+                <option value="reading">Reading order</option>
+                <option value="table">Align table rows</option>
+            </select></label>
+            <label>Sort by<select id="organizerSort">
+                <option value="source">Document order</option>
+                <option value="text">Text A–Z</option>
+                <option value="dateAsc">Date · oldest first</option>
+                <option value="dateDesc">Date · newest first</option>
+            </select></label>
+            <label>Date format<select id="organizerDates">
+                <option value="safe">Unambiguous dates only</option>
+                <option value="dmy">Day / month / year</option>
+                <option value="mdy">Month / day / year</option>
+            </select></label>
+        </div>
+        <p id="organizerStatus" role="status"></p>
+        <div class="organizer-list">
+            <table>
+                <thead><tr><th scope="col" class="report-selection">Keep</th><th scope="col">Page</th><th scope="col">Date</th><th scope="col">Extracted text</th></tr></thead>
+                <tbody id="organizerRows"></tbody>
+            </table>
+        </div>
+        <footer class="organizer-footer">
+            <span id="organizerRange"></span>
+            <button id="organizerPrev" class="btn">Previous</button>
+            <button id="organizerNext" class="btn">Next</button>
+            <button id="organizerRestore" class="btn" disabled>Restore excluded</button>
+            <button id="organizerCsv" class="btn">Export CSV</button>
+            <button id="organizerPrint" class="btn primary">Print / Save PDF</button>
+        </footer>
+    </dialog>
+    <section id="printReport" aria-label="Organized PDF report"></section>
     <script src="app.js"></script>
+    <script src="organizer.js"></script>
 </body>
 </html>
