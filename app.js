@@ -258,7 +258,7 @@ function updateToolUI() {
     if (state.tool === 'replace') {
         document.querySelectorAll('.page-wrapper').forEach(addSourceTextTargets);
     }
-    const names = { replace: 'Tap existing text to edit it, or drag it to move it', area: 'Draw a box around content to pick it up or replace it', select: 'Select and move', text: 'Click anywhere to type', whiteout: 'Drag to cover content', highlight: 'Drag to highlight', rectangle: 'Drag to add a rectangle', draw: 'Draw or sign' };
+    const names = { replace: 'Tap existing text to edit it, or drag it to move it', area: 'Draw a box around content to pick it up or replace it', select: matchMedia('(pointer: coarse)').matches ? 'Select, pan, or pinch to zoom' : 'Select and move', text: 'Click anywhere to type', whiteout: 'Drag to cover content', highlight: 'Drag to highlight', rectangle: 'Drag to add a rectangle', draw: 'Draw or sign' };
     setStatus(state.pdfDoc ? names[state.tool] : 'Ready — open a PDF to begin');
 }
 
@@ -594,9 +594,21 @@ function startElementDrag(e, el, isResize) {
     elStartH = parseFloat(el.style.height) || 0;
 }
 
+function cancelElementDrag() {
+    if (!dragTarget) return;
+    dragTarget.style.left = `${elStartX}px`;
+    dragTarget.style.top = `${elStartY}px`;
+    if (dragType === 'resize') {
+        dragTarget.style.width = `${elStartW}px`;
+        dragTarget.style.height = `${elStartH}px`;
+    }
+    dragTarget = null;
+}
+
 function setupGlobalDrag() {
     if (globalDragReady) return;
     globalDragReady = true;
+    window.addEventListener('pointercancel', cancelElementDrag);
     window.addEventListener('pointermove', (e) => {
         if (!dragTarget) return;
         e.preventDefault();
@@ -835,6 +847,89 @@ window.addEventListener('keydown', (e) => {
     const tool = shortcuts[e.key.toLowerCase()];
     if (tool) { state.tool = tool; updateToolUI(); }
 });
+
+// Keep the PDF point under the fingers stable when re-rendering at the new scale.
+function setupPinchZoom() {
+    const scroller = document.getElementById('viewer-container');
+    let gesture;
+    let rendering = false;
+
+    function measure(touches) {
+        const [first, second] = touches;
+        return {
+            x: (first.clientX + second.clientX) / 2,
+            y: (first.clientY + second.clientY) / 2,
+            distance: Math.hypot(first.clientX - second.clientX, first.clientY - second.clientY)
+        };
+    }
+
+    scroller.addEventListener('touchstart', event => {
+        if (event.touches.length !== 2 || state.tool !== 'select' || rendering || !state.pdfDoc) return;
+        const start = measure(event.touches);
+        const bounds = viewer.getBoundingClientRect();
+        const page = [...viewer.querySelectorAll('.page-wrapper')].find(wrapper => {
+            const rect = wrapper.getBoundingClientRect();
+            return start.y >= rect.top && start.y <= rect.bottom;
+        }) || viewer.querySelector(`[data-page-num="${state.currentPage}"]`);
+        if (!page || start.distance < 10) return;
+        if (event.cancelable) event.preventDefault();
+        cancelElementDrag();
+        const rect = page.getBoundingClientRect();
+        gesture = {
+            start, current: start, scale: state.scale, targetScale: state.scale,
+            pdf: state.pdfDoc, page: Number(page.dataset.pageNum),
+            pageX: (start.x - rect.left) / rect.width,
+            pageY: (start.y - rect.top) / rect.height
+        };
+        viewer.style.transformOrigin = `${start.x - bounds.left}px ${start.y - bounds.top}px`;
+    }, { passive: false });
+
+    scroller.addEventListener('touchmove', event => {
+        if (!gesture || event.touches.length !== 2) return;
+        if (event.cancelable) event.preventDefault();
+        const current = measure(event.touches);
+        gesture.current = current;
+        gesture.targetScale = Math.max(0.15, Math.min(3, gesture.scale * current.distance / gesture.start.distance));
+        viewer.style.transform = `translate(${current.x - gesture.start.x}px, ${current.y - gesture.start.y}px) scale(${gesture.targetScale / gesture.scale})`;
+        zoomLevelText.textContent = Math.round(gesture.targetScale * 100) + '%';
+    }, { passive: false });
+
+    async function finish(event) {
+        if (!gesture || (event.type === 'touchend' && event.touches.length >= 2)) return;
+        if (event.cancelable) event.preventDefault();
+        const { targetScale, pdf, page, pageX, pageY, current } = gesture;
+        gesture = null;
+        viewer.style.transform = '';
+        viewer.style.transformOrigin = '';
+        if (event.type === 'touchcancel' || state.pdfDoc !== pdf || Math.abs(targetScale - state.scale) < 0.005) {
+            zoomLevelText.textContent = Math.round(state.scale * 100) + '%';
+            return;
+        }
+        rendering = true;
+        state.scale = targetScale;
+        state.currentPage = page;
+        updatePageControls();
+        try {
+            await renderPages();
+            if (state.pdfDoc !== pdf) return;
+            const rect = viewer.querySelector(`[data-page-num="${page}"]`)?.getBoundingClientRect();
+            if (rect) {
+                scroller.scrollLeft += rect.left + rect.width * pageX - current.x;
+                scroller.scrollTop += rect.top + rect.height * pageY - current.y;
+            }
+            setStatus(`Zoom ${zoomLevelText.textContent}`);
+        } catch (error) {
+            setStatus(`Could not render the new zoom level. ${error.message}`);
+        } finally {
+            rendering = false;
+        }
+    }
+
+    scroller.addEventListener('touchend', finish, { passive: false });
+    scroller.addEventListener('touchcancel', finish);
+}
+
+setupPinchZoom();
 
 // Zoom
 document.getElementById('btnZoomIn').addEventListener('click', () => {

@@ -40,6 +40,6 @@ With **Edit PDF text**, tap selectable horizontal text to replace it or drag it 
 
 ## Use on a phone or install on a PC
 
-Open the hosted app in Chrome or Edge, then use **Install app** in the footer or the browser's install menu. The editor runs in its own window and can reopen offline after its files finish caching. On iOS, use **Add to Home Screen** in Safari's Share menu. The mobile layout fits the PDF to the screen on open and has a scrolling touch toolbar. Turn on **Select** to pan the document between edits.
+Open the hosted app in Chrome or Edge, then use **Install app** in the footer or the browser's install menu. The editor runs in its own window and can reopen offline after its files finish caching. On iOS, use **Add to Home Screen** in Safari's Share menu. The mobile layout fits the PDF to the screen on open and has a scrolling touch toolbar. Use **Select** to pan the document or pinch with two fingers to zoom.
 
 In **Auto-organize**, filter by page, use **Edit** to correct extracted rows, or use **Add row** to transcribe missing text. Report edits appear in the exports and stay in the current report while the PDF is open.

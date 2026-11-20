@@ -128,10 +128,11 @@
             </div>
             <form method="dialog"><button class="btn" aria-label="Close organizer">Close</button></form>
         </header>
-        <p class="organizer-help">Extract text into a searchable report with the original page references. Check the reading order on tables and multi-column pages before exporting.</p>
         <div class="organizer-controls">
-            <label>Search text<input id="organizerSearch" type="search" placeholder="Filter rows"></label>
-            <label>Page<select id="organizerPage"><option value="">All pages</option></select></label>
+            <label class="organizer-search">Search report<span class="organizer-search-field">
+                <input id="organizerSearch" type="search" placeholder="Find text in rows">
+            </span></label>
+            <label class="organizer-page">Source page<select id="organizerPage"><option value="">All pages</option></select></label>
             <label>Layout<select id="organizerLayout">
                 <option value="reading">Reading order</option>
                 <option value="table">Align table rows</option>
@@ -139,17 +140,18 @@
             <label>Sort by<select id="organizerSort">
                 <option value="source">Document order</option>
                 <option value="text">Text A–Z</option>
-                <option value="dateAsc">Date · oldest first</option>
-                <option value="dateDesc">Date · newest first</option>
+                <option value="dateAsc">Oldest first</option>
+                <option value="dateDesc">Newest first</option>
             </select></label>
             <label>Date format<select id="organizerDates">
-                <option value="safe">Unambiguous dates only</option>
+                <option value="safe">Unambiguous only</option>
                 <option value="dmy">Day / month / year</option>
                 <option value="mdy">Month / day / year</option>
             </select></label>
         </div>
-        <div class="report-status"><p id="organizerStatus" role="status"></p>
-            <button id="organizerAdd" class="btn" type="button" disabled>Add row</button>
+        <div class="report-status">
+            <p id="organizerStatus" role="status"></p>
+            <button id="organizerAdd" class="btn" type="button" disabled><span aria-hidden="true">+</span> Add row</button>
         </div>
         <div class="organizer-list">
             <table>
@@ -158,12 +160,16 @@
             </table>
         </div>
         <footer class="organizer-footer">
-            <span id="organizerRange"></span>
-            <button id="organizerPrev" class="btn">Previous</button>
-            <button id="organizerNext" class="btn">Next</button>
-            <button id="organizerRestore" class="btn" disabled>Restore excluded</button>
-            <button id="organizerCsv" class="btn">Export CSV</button>
-            <button id="organizerPrint" class="btn primary">Print / Save PDF</button>
+            <div class="organizer-pagination">
+                <button id="organizerPrev" class="btn" aria-label="Previous rows">‹</button>
+                <span id="organizerRange"></span>
+                <button id="organizerNext" class="btn" aria-label="Next rows">›</button>
+            </div>
+            <div class="organizer-actions">
+                <button id="organizerRestore" class="btn" disabled>Restore excluded</button>
+                <button id="organizerCsv" class="btn">Export CSV</button>
+                <button id="organizerPrint" class="btn primary">Print / Save PDF</button>
+            </div>
         </footer>
     </dialog>
     <dialog id="reportRowEditor" class="compact-dialog" aria-labelledby="reportRowTitle">
@@ -225,7 +231,7 @@
         </header>
         <ul class="release-notes">
             <li><strong>Move PDF content</strong> Drag selectable text or pick up a page area, including artwork and scanned text.</li>
-            <li><strong>Mobile and desktop</strong> Use touch controls on phones or install the editor as a web app.</li>
+            <li><strong>Mobile and desktop</strong> Pinch to zoom in Select mode on phones, or install the editor as a web app.</li>
             <li><strong>Versions</strong> Save named checkpoints and restore them in the same browser.</li>
             <li><strong>Edit PDF text</strong> Select existing text, cover it, and add a replacement you can move.</li>
             <li><strong>Export pages</strong> Extract or reorder pages while keeping your edits.</li>
