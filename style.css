@@ -237,3 +237,13 @@ button, label { user-select: none; }
 .overlay-layer.mode-replace ~ .source-text-targets { display: block; }
 .source-text-targets button { position: absolute; pointer-events: auto; cursor: text; border: 1px solid #4d5ad755; background: #5868ec12; padding: 0; }
 .source-text-targets button:hover, .source-text-targets button:focus-visible { background: #5868ec38; outline: 2px solid #5868ec; }
+
+.status-link { background: none; border: 0; color: #b3bcff; cursor: pointer; font: inherit; white-space: nowrap; padding: 5px 0; }
+.dialog-note { margin: 12px 0; }
+#versionStatus { margin: 12px 0 6px; }
+#versionList, .release-notes { padding: 0; list-style: none; }
+#versionList li, .release-notes li { padding: 10px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+#versionList li { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+#versionList time { display: block; color: var(--muted); font-size: .78rem; }
+.release-notes li { line-height: 1.5; font-size: .85rem; }
+.release-notes strong { display: block; }

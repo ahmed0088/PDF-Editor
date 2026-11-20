@@ -44,6 +44,7 @@
         </div>
 
         <button id="btnProperties" class="btn" aria-expanded="false" aria-controls="properties-sidebar">Properties</button>
+        <button id="btnVersions" class="btn" disabled>Versions</button>
         <button id="btnPages" class="btn" disabled>Pages</button>
         <button id="btnOrganize" class="btn organize" disabled>Auto-organize</button>
         <button id="btnSave" class="btn success" disabled>Save PDF</button>
@@ -107,7 +108,7 @@
         </aside>
     </main>
 
-    <footer id="statusbar"><span id="statusText" role="status">Ready — open a PDF to begin</span><span class="shortcut-hint">V select · T text · R cover · H highlight · B shape · D draw · Delete remove</span></footer>
+    <footer id="statusbar"><span id="statusText" role="status">Ready — open a PDF to begin</span><span class="shortcut-hint">V select · T text · R cover · H highlight · B shape · D draw · Delete remove</span><button id="btnWhatsNew" class="status-link" type="button">What’s new</button></footer>
 
     <!-- Loader -->
     <div id="loader" class="hidden">
@@ -186,9 +187,33 @@
             <p id="replaceError" role="alert"></p>
         </form>
     </dialog>
+    <dialog id="versions" class="compact-dialog" aria-labelledby="versionsTitle">
+        <header class="organizer-header"><h2 id="versionsTitle">Versions</h2>
+            <button type="button" class="btn" data-close>Close</button>
+        </header>
+        <p class="dialog-note">Save your edits in this browser. Reopen the same original PDF to restore them later.</p>
+        <form id="saveVersionForm">
+            <label>Version name<input id="versionName" type="text" maxlength="80" required></label>
+            <button id="saveVersion" class="btn primary" disabled>Save version</button>
+        </form>
+        <p id="versionStatus" role="status"></p>
+        <ul id="versionList"></ul>
+    </dialog>
+    <dialog id="whatsNew" class="compact-dialog" aria-labelledby="whatsNewTitle">
+        <header class="organizer-header"><h2 id="whatsNewTitle">What’s new</h2>
+            <form method="dialog"><button class="btn">Close</button></form>
+        </header>
+        <ul class="release-notes">
+            <li><strong>Versions</strong> Save named checkpoints and restore them in the same browser.</li>
+            <li><strong>Edit PDF text</strong> Select existing text, cover it, and add a replacement you can move.</li>
+            <li><strong>Export pages</strong> Extract or reorder pages while keeping your edits.</li>
+            <li><strong>Auto-organize</strong> Review extracted text, sort or filter it, and export it to CSV or PDF.</li>
+        </ul>
+    </dialog>
     <section id="printReport" aria-label="Organized PDF report"></section>
     <script src="app.js"></script>
     <script src="organizer.js"></script>
     <script src="document-tools.js"></script>
+    <script src="versions.js"></script>
 </body>
 </html>

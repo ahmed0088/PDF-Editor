@@ -27,3 +27,9 @@ This tool creates overlays. The original text remains in the file. Scans, text d
 ## Export specific pages
 
 Choose **Pages**, then enter page numbers and ranges in the order you want. For example, `5, 1–3` puts page 5 first and omits page 4. An export includes your edits for the selected pages. Document links to omitted pages can break.
+
+## Versions and updates
+
+Use **Versions** to save named checkpoints for a PDF. Reopen the same original file in the same browser to restore a checkpoint. A restore can be undone during the active editing session. Checkpoints are stored locally in browser site data and include your annotations and rotation settings. Download a PDF copy if you need to share or retain it outside that browser.
+
+Open **What’s new** at the bottom of the editor to see recent changes.

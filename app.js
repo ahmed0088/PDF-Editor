@@ -53,6 +53,7 @@ function updatePageControls() {
     btnClearPage.disabled = !total;
     document.getElementById("btnOrganize").disabled = !total;
     document.getElementById("btnPages").disabled = !total;
+    document.getElementById("btnVersions").disabled = !total;
     document.getElementById('btnPrevPage').disabled = !total || state.currentPage <= 1;
     document.getElementById('btnNextPage').disabled = !total || state.currentPage >= total;
 }
