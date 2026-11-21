@@ -16,6 +16,7 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { min-height: 100%; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body {
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     background: radial-gradient(circle at 50% -20%, #1c2a50 0, var(--bg) 48%);
@@ -31,15 +32,14 @@ button, label { user-select: none; }
 
 #top-toolbar {
     min-height: 68px;
-    background: rgba(17, 24, 42, .9);
+    background: #11182a;
     border-bottom: 1px solid var(--line);
-    padding: 12px 22px;
+    padding: calc(12px + env(safe-area-inset-top)) max(22px, env(safe-area-inset-right)) 12px max(22px, env(safe-area-inset-left));
     display: flex;
     align-items: center;
     gap: 10px;
     z-index: 100;
     box-shadow: 0 8px 30px rgba(0, 0, 0, .16);
-    backdrop-filter: blur(18px);
 }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 760; font-size: 1rem; margin-right: 12px; white-space: nowrap; }
 .brand-mark { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; color: white; background: linear-gradient(135deg, #8290ff, #5967f2); box-shadow: 0 5px 18px rgba(109, 124, 255, .4); }
@@ -134,7 +134,7 @@ button, label { user-select: none; }
 
 @media (max-width: 860px) {
     #properties-sidebar { width: 215px; padding: 16px 12px; }
-    #top-toolbar { padding: 10px 12px; gap: 7px; }
+    #top-toolbar { padding: calc(10px + env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 10px max(12px, env(safe-area-inset-left)); gap: 7px; }
     .brand { margin-right: 3px; }
     .brand span:last-child { display: none; }
     .shortcut-hint { display: none; }
@@ -153,6 +153,7 @@ button, label { user-select: none; }
 }
 
 #top-toolbar { flex-wrap: wrap; }
+#top-toolbar .btn:hover:not(:disabled) { transform: none; }
 #viewer-container { align-items: safe center; overflow-anchor: none; }
 #viewer { flex: none; }
 .empty-state { width: min(600px, 100%); }
@@ -332,13 +333,12 @@ button, label { user-select: none; }
         display: grid;
         min-height: 0;
         gap: 0;
-        padding: env(safe-area-inset-top) 0 0;
+        padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
         flex: none;
         color: #17264a;
         background: #fff;
         border-bottom: 1px solid #d9e1ef;
         box-shadow: 0 3px 12px #15264810;
-        backdrop-filter: none;
     }
     #top-toolbar .brand { display: none; }
     .toolbar-document {
@@ -354,13 +354,21 @@ button, label { user-select: none; }
         border-radius: 10px;
         background: #f0f3fa;
         color: #17264a;
-        font-size: .78rem;
+        font-size: .8125rem;
         white-space: nowrap;
         touch-action: manipulation;
     }
     #top-toolbar .btn:active:not(:disabled) { background: #e1e9f8; transform: none; }
     #top-toolbar #btnOpen { background: #edf1ff; color: #3248a7; }
     #top-toolbar #btnSave { background: #3349b8; color: #fff; }
+    #top-toolbar .btn:disabled, #top-toolbar #btnSave:disabled {
+        opacity: 1;
+        background: #f2f5fa;
+        color: #63738d;
+    }
+    #top-toolbar .history-controls .btn:disabled,
+    #top-toolbar .page-controls .btn:disabled { background: transparent; }
+    #top-toolbar .btn:disabled span { color: inherit; }
     .history-controls { justify-self: center; gap: 2px; padding: 0; background: none; border: 0; }
     #top-toolbar .history-controls .btn { min-width: 48px; padding: 5px 6px; gap: 4px; background: transparent; }
     .history-controls .btn span { color: #364aa6; font-size: 1.1rem; }
@@ -383,8 +391,8 @@ button, label { user-select: none; }
         display: none;
         position: absolute;
         top: calc(100% + 6px);
-        right: 10px;
-        width: min(338px, calc(100% - 20px));
+        right: max(10px, env(safe-area-inset-right));
+        width: min(338px, calc(100% - 20px - env(safe-area-inset-left) - env(safe-area-inset-right)));
         max-height: 65dvh;
         overflow: auto;
         padding: 12px;
