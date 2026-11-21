@@ -611,3 +611,81 @@ button, label { user-select: none; }
 @media (max-width: 620px) { #sourceActions { bottom: 70px; } }
 
 .source-text-targets button[hidden] { display: none; }
+
+#appearance .dialog-note { display: grid; gap: 6px; }
+#cloudLogin[hidden], #cloudAccount[hidden] { display: none; }
+#cloudAccount, #cloudHistory { display: grid; gap: 10px; }
+#cloudHistory { max-height: 36dvh; overflow: auto; list-style: none; margin: 6px 0; }
+#cloudHistory li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 3px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+#cloudHistory small { display: block; margin-top: 4px; color: var(--muted); }
+#cloudFeedback { margin-top: 8px; }
+#cloudDot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: #8b97af; }
+#btnCloud[data-online="true"] #cloudDot { background: #28b792; }
+#btnCloud[data-connection="blocked"] #cloudDot { background: #e3a536; }
+.toolbar-options { flex-wrap: wrap; }
+
+:root[data-theme="light"] {
+    color-scheme: light;
+    --bg: #eef2fa;
+    --panel: #fff;
+    --panel-strong: #edf1fa;
+    --surface: #eaf0fb;
+    --surface-hover: #dce7fa;
+    --line: #d4ddeb;
+    --text: #17264a;
+    --muted: #50617b;
+    --accent: #3b50c6;
+    --accent-strong: #3045b2;
+    --shadow: 0 12px 42px #243d6e29;
+}
+:root[data-theme="light"] body { background: var(--bg); }
+:root[data-theme="light"] :is(#top-toolbar, #tool-sidebar, #properties-sidebar, #statusbar, .toolbar-menu) { background: var(--panel); color: var(--text); }
+:root[data-theme="light"] #viewer-container { background: #e8edf6; }
+:root[data-theme="light"] :is(.history-controls, .prop-group, #pageThumbnails li, .signature-mode) { background: var(--panel-strong); }
+:root[data-theme="light"] :is(.prop-group input, #properties-sidebar select, .compact-dialog input, .compact-dialog select, .compact-dialog textarea) { background: #f7f9fd; color: var(--text); border-color: var(--line); color-scheme: light; }
+:root[data-theme="light"] :is(.status-link, #findPdfResults strong, .history-controls .btn span) { color: #344aad; }
+:root[data-theme="light"] .btn.danger { color: #922238; background: #fae8ec; }
+
+:root[data-theme="night"] {
+    --bg: #090c14;
+    --panel: #11151f;
+    --panel-strong: #191e2a;
+    --surface: #212838;
+    --surface-hover: #292f40;
+    --line: #30384a;
+    --text: #e3e8f3;
+    --muted: #a3adbf;
+    --accent: #8899ff;
+    --accent-strong: #5267d7;
+    --shadow: 0 12px 42px #0007;
+}
+:root[data-theme="night"] body { background: var(--bg); }
+:root:is([data-theme="dark"], [data-theme="night"]) { color-scheme: dark; }
+:root:is([data-theme="dark"], [data-theme="night"]) :is(#top-toolbar, #tool-sidebar, #properties-sidebar, #statusbar, .toolbar-menu) { background: var(--panel); color: var(--text); border-color: var(--line); }
+:root:is([data-theme="dark"], [data-theme="night"]) #viewer-container { background: var(--bg); }
+:root:is([data-theme="dark"], [data-theme="night"]) #viewer.empty-state { background: var(--panel); color: var(--muted); border-color: var(--line); }
+:root:is([data-theme="dark"], [data-theme="night"]) #viewer.empty-state h2 { color: var(--text); }
+:root:is([data-theme="dark"], [data-theme="night"]) #organizer {
+    --report-ink: var(--text);
+    --report-muted: var(--muted);
+    --report-line: var(--line);
+    --report-tint: var(--panel-strong);
+    --report-accent: #4559c6;
+    background: var(--panel);
+    color-scheme: dark;
+}
+:root:is([data-theme="dark"], [data-theme="night"]) #organizer :is(input, select, .btn) { background: var(--surface); color: var(--text); border-color: var(--line); }
+:root:is([data-theme="dark"], [data-theme="night"]) #organizer :is(.primary, #organizerAdd) { background: #4054ba; color: #fff; border-color: #4054ba; }
+:root:is([data-theme="dark"], [data-theme="night"]) #organizer tbody tr:hover { background: var(--panel-strong); }
+@media (max-width: 620px) {
+    :root:is([data-theme="dark"], [data-theme="night"]) #top-toolbar .btn {
+        background: var(--surface);
+        color: var(--text);
+    }
+    :root:is([data-theme="dark"], [data-theme="night"]) #top-toolbar :is(#btnOpen, #btnSave, #btnOrganize) { background: #394caa; color: #fff; }
+    :root:is([data-theme="dark"], [data-theme="night"]) #top-toolbar .btn:disabled { background: var(--panel-strong); color: var(--muted); }
+    :root:is([data-theme="dark"], [data-theme="night"]) .toolbar-view .page-controls input { background: var(--surface); color: var(--text); }
+    :root:is([data-theme="dark"], [data-theme="night"]) #tool-sidebar .tool-btn { color: var(--muted); }
+    :root:is([data-theme="dark"], [data-theme="night"]) #tool-sidebar .tool-btn.active { background: #293a75; color: #fff; }
+    :root:is([data-theme="dark"], [data-theme="night"]) #statusbar .status-link { color: #afbaff; }
+}

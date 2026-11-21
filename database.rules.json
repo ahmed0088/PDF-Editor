@@ -1,0 +1,30 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "pdfEditorPrivate": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "history": {
+          "$checkpoint": {
+            ".validate": "newData.hasChildren(['name','fileName','time','fileId','fileParts','draftParts']) && newData.child('name').isString() && newData.child('name').val().length <= 100 && newData.child('fileName').isString() && newData.child('fileName').val().length <= 255 && newData.child('time').isNumber() && newData.child('fileId').isString() && newData.child('fileId').val().matches(/^[a-f0-9]{64}$/) && newData.child('fileParts').isNumber() && newData.child('fileParts').val() >= 1 && newData.child('fileParts').val() <= 86 && newData.child('draftParts').isNumber() && newData.child('draftParts').val() >= 1 && newData.child('draftParts').val() <= 28"
+          }
+        },
+        "files": {
+          "$fileId": {
+            "count": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 86" },
+            "parts": { "$part": { ".validate": "newData.isString() && newData.val().length <= 410000" } },
+            "$other": { ".validate": false }
+          }
+        },
+        "drafts": {
+          "$checkpoint": {
+            "$part": { ".validate": "newData.isString() && newData.val().length <= 410000" }
+          }
+        },
+        "$other": { ".validate": false }
+      }
+    }
+  }
+}

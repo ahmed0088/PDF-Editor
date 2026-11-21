@@ -71,3 +71,13 @@ Choose **Edit PDF text** and tap a highlighted source item, or use **Move area**
 In **Edit PDF text**, tap or click text boxes to toggle them in the selection. With one item selected, choose **Edit** or press **Enter** while it is focused. Use the **Delete** button, **Delete**, or **Backspace** to remove the selection in one undoable action. **Clear** or **Escape** deselects the items.
 
 **Edit PDF text** stays active after a replacement or deletion. Select the next item to continue, or choose **Done** to return to Select. Covered source boxes return when you undo, so you can select them again.
+
+## Appearance and optional Firebase history
+
+Use **Appearance** for Light, Dark, Night, or System. The choice is saved in this browser.
+
+**Cloud** offers email/password sign-in and named PDF checkpoints. Saving a cloud checkpoint is explicit. The original PDF and an editable draft are stored under the signed-in UID. The gray or green dot and the Cloud dialog show whether Firebase is connected. Recent files and local Versions work separately.
+
+Before enabling cloud storage, the Firebase project administrator must enable **Email/Password** under Authentication and publish private **Realtime Database Rules**. This repository includes `database.rules.json` for a dedicated database and `firebase.json` for deployment with the Firebase CLI. For a shared database, merge the private branch rules with existing rules and remove public ancestor permissions, since broader grants cannot be revoked by a child rule. The app blocks uploads when a test read succeeds without authentication or from another account. Do not publish sensitive files until the deployed rules have been reviewed.
+
+After publishing the private Firebase rules, open **Cloud**, sign in, and choose **Check connection**. A green dot confirms the app can read your account’s history and rejects the connection probes from unauthenticated and other-account requests.

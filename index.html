@@ -55,6 +55,8 @@
             </div>
             <div class="toolbar-options">
                 <button id="btnProperties" class="btn" aria-expanded="false" aria-controls="properties-sidebar">Properties</button>
+                <button id="btnCloud" class="btn" type="button"><span id="cloudDot" aria-hidden="true"></span>Cloud</button>
+                <button id="btnAppearance" class="btn" type="button">Appearance</button>
                 <button id="btnRecent" class="btn" type="button">Recent</button>
                 <button id="btnFind" class="btn" type="button" disabled>Find</button>
                 <button id="btnVersions" class="btn" disabled>Versions</button>
@@ -224,6 +226,43 @@
             <p id="pageExportError" role="alert"></p>
         </form>
     </dialog>
+    <dialog id="appearance" class="compact-dialog" aria-labelledby="appearanceTitle">
+        <header class="organizer-header"><h2 id="appearanceTitle">Appearance</h2>
+            <form method="dialog"><button class="btn">Close</button></form>
+        </header>
+        <label class="dialog-note">Theme<select id="themeChoice">
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+            <option value="night">Night</option>
+        </select></label>
+    </dialog>
+    <dialog id="cloud" class="compact-dialog" aria-labelledby="cloudTitle">
+        <header class="organizer-header"><h2 id="cloudTitle">Cloud history</h2>
+            <form method="dialog"><button class="btn">Close</button></form>
+        </header>
+        <p id="cloudConnection" class="dialog-note" role="status">Signed out</p>
+        <form id="cloudLogin" hidden>
+            <label>Email<input id="cloudEmail" type="email" required autocomplete="username"></label>
+            <label>Password<input id="cloudPassword" type="password" required autocomplete="current-password"></label>
+            <div class="dialog-actions">
+                <button class="btn primary">Sign in</button>
+                <button class="btn" type="button" id="cloudCreate">Create account</button>
+                <button class="btn" type="button" id="cloudReset">Reset password</button>
+            </div>
+        </form>
+        <section id="cloudAccount" hidden>
+            <div class="dialog-actions"><button id="cloudRecheck" class="btn" type="button">Check connection</button>
+                <button id="cloudSignOut" class="btn" type="button">Sign out</button>
+            </div>
+            <form id="cloudSave">
+                <label>Checkpoint name<input id="cloudCheckpoint" type="text" maxlength="100" required></label>
+                <button id="cloudSaveButton" class="btn primary" disabled>Save checkpoint</button>
+            </form>
+            <ul id="cloudHistory"></ul>
+        </section>
+        <p id="cloudFeedback" role="status"></p>
+    </dialog>
     <dialog id="recentFiles" class="compact-dialog" aria-labelledby="recentTitle">
         <header class="organizer-header"><h2 id="recentTitle">Recent PDFs</h2>
             <form method="dialog"><button class="btn">Close</button></form>
@@ -343,5 +382,7 @@
     <script src="install.js"></script>
     <script src="signature.js"></script>
     <script src="workspace-tools.js"></script>
+    <script src="appearance.js"></script>
+    <script src="cloud.js"></script>
 </body>
 </html>
