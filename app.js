@@ -56,6 +56,7 @@ function updatePageControls() {
     btnClearPage.disabled = !total;
     document.getElementById("btnOrganize").disabled = !total;
     document.getElementById("btnPages").disabled = !total;
+    document.getElementById("btnFind").disabled = !total;
     document.getElementById("btnSignature").disabled = !total;
     document.getElementById("btnVersions").disabled = !total;
     document.getElementById('btnPrevPage').disabled = !total || state.currentPage <= 1;
@@ -74,6 +75,7 @@ function goToPage(page) {
 function setSelection(element) {
     document.querySelectorAll('.editor-element').forEach(el => el.classList.remove('selected'));
     state.selectedEl = element || null;
+    updatePropertyGroups();
     if (element) {
         element.classList.add('selected');
         btnDelete.disabled = false;
@@ -91,6 +93,12 @@ function setSelection(element) {
         btnDelete.disabled = true;
         if (selectionStatus) selectionStatus.textContent = 'Nothing selected';
     }
+}
+
+function updatePropertyGroups() {
+    const selection = state.selectedEl?.elData?.type;
+    const mode = selection || ({ text: 'text', replace: 'text', rectangle: 'shape', draw: 'draw' })[state.tool];
+    document.getElementById('properties-sidebar').dataset.mode = mode || '';
 }
 
 function updateSelectedProperty(name, value) {
@@ -182,7 +190,7 @@ dropZone.addEventListener('drop', event => {
     if (file) openPDF(file);
 });
 
-async function openPDF(file) {
+async function openPDF(file, draft) {
     if (!loader.classList.contains('hidden')) return;
     document.getElementById('btnMore').setAttribute('aria-expanded', 'false');
     document.getElementById('toolbarMenu').classList.remove('is-open');
@@ -201,22 +209,25 @@ async function openPDF(file) {
         state.originalBytes = bytes;
         state.fileName = file.name;
         state.pdfDoc = documentToOpen;
+        clearFindResults();
         if (state.tool === 'signature') {
             state.tool = 'select';
             updateToolUI();
         }
-        state.elements.clear();
+        state.elements = draft?.elements || new Map();
         state.pageViewports.clear();
         state.history = [];
         state.historyIndex = -1;
-        state.currentPage = 1;
-        state.pageRotations.clear();
-        saveHistory();
+        state.currentPage = Math.max(1, Math.min(documentToOpen.numPages, draft?.page || 1));
+        state.pageRotations = draft?.rotations || new Map();
+        saveHistory(false);
         btnSave.disabled = false;
         viewer.classList.remove('empty-state');
         updatePageControls();
         if (matchMedia('(max-width: 620px)').matches) await fitPageWidth();
         await renderPages();
+        if (draft) goToPage(state.currentPage);
+        rememberDocument(true);
         setStatus(`${file.name} loaded · ${state.pdfDoc.numPages} page${state.pdfDoc.numPages === 1 ? '' : 's'}`);
     } catch (error) {
         if (loadingTask && state.pdfDoc?.loadingTask !== loadingTask) {
@@ -308,6 +319,7 @@ async function renderPages() {
 
 // --- Tools & Interaction Logic ---
 function updateToolUI() {
+    updatePropertyGroups();
     toolBtns.forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tool === state.tool);
     });
@@ -768,7 +780,7 @@ function updateStateData(newData, pageNum, domEl) {
     state.elements.set(pageNum, pageEls);
 }
 
-function saveHistory() {
+function saveHistory(persist = true) {
     // Trim future history if we undid and then made a new action
     if (state.historyIndex < state.history.length - 1) {
         state.history = state.history.slice(0, state.historyIndex + 1);
@@ -779,6 +791,7 @@ function saveHistory() {
     state.historyIndex++;
 
     updateUndoRedoButtons();
+    if (persist) rememberDocument();
 }
 
 function renderPageEdits(wrapper, pageNum) {
@@ -799,6 +812,7 @@ function moveHistory(offset) {
     viewer.querySelectorAll('.page-wrapper').forEach(wrapper => renderPageEdits(wrapper, Number(wrapper.dataset.pageNum)));
     updateUndoRedoButtons();
     setStatus(offset < 0 ? 'Undo complete' : 'Redo complete');
+    rememberDocument();
 }
 
 function undo() {
@@ -907,15 +921,15 @@ document.getElementById('btnFitWidth').addEventListener('click', async () => {
     await renderPages();
     goToPage(page);
 });
-function rotateCurrentPage(amount) {
+function rotatePage(number, amount) {
     if (!state.pdfDoc) return;
-    const current = state.pageRotations.get(state.currentPage) || 0;
-    state.pageRotations.set(state.currentPage, (current + amount + 360) % 360);
+    const current = state.pageRotations.get(number) || 0;
+    state.pageRotations.set(number, (current + amount + 360) % 360);
     saveHistory();
-    setStatus(`Page ${state.currentPage} rotation set to ${state.pageRotations.get(state.currentPage)}° · applied on export`);
+    setStatus(`Page ${number} rotation set to ${state.pageRotations.get(number)}° · applied on export`);
 }
-document.getElementById('btnRotateLeft').addEventListener('click', () => rotateCurrentPage(-90));
-document.getElementById('btnRotateRight').addEventListener('click', () => rotateCurrentPage(90));
+document.getElementById('btnRotateLeft').addEventListener('click', () => rotatePage(state.currentPage, -90));
+document.getElementById('btnRotateRight').addEventListener('click', () => rotatePage(state.currentPage, 90));
 btnClearPage.addEventListener('click', () => {
     if (!state.elements.get(state.currentPage)?.length) {
         setStatus('No edits to clear on this page');
@@ -1072,114 +1086,115 @@ document.getElementById('btnZoomIn').addEventListener('click', () => stepZoom(0.
 document.getElementById('btnZoomOut').addEventListener('click', () => stepZoom(-0.25));
 
 // --- Save PDF ---
-btnSave.addEventListener('click', () => savePDF());
+async function buildEditedPDF(pageOrder, appendFiles = []) {
+    const { PDFDocument, rgb, degrees } = PDFLib;
+    const pdfDoc = await PDFDocument.load(state.originalBytes);
+    const pages = pdfDoc.getPages();
+    const embeddedFonts = new Map();
 
-async function savePDF(pageOrder) {
-    if (!state.originalBytes || !loader.classList.contains('hidden')) return;
-    loader.classList.remove('hidden');
-    loaderText.textContent = 'Building your edited PDF…';
+    for (const i of new Set(pageOrder || pages.map((_, index) => index + 1))) {
+        const page = pages[i - 1];
+        const rotation = state.pageRotations.get(i);
+        const originalRotation = page.getRotation().angle;
+        const viewport = state.pageViewports.get(i);
+        const angle = degrees(viewport?.rotation || 0);
+        function pdfPoint(x, y) {
+            const [pdfX, pdfY] = viewport.convertToPdfPoint(x, viewport.height - y);
+            return { x: pdfX, y: pdfY };
+        }
+        if (rotation !== undefined) page.setRotation(degrees((originalRotation + rotation) % 360));
+        const els = state.elements.get(i) || [];
 
-    try {
-        const { PDFDocument, rgb, degrees } = PDFLib;
-        const pdfDoc = await PDFDocument.load(state.originalBytes);
-        const pages = pdfDoc.getPages();
-        const embeddedFonts = new Map();
+        for (const el of els) {
+            if (el.type === 'shape') {
+                const hex = el.color.replace('#', '');
+                const r = parseInt(hex.substring(0, 2), 16) / 255;
+                const g = parseInt(hex.substring(2, 4), 16) / 255;
+                const b = parseInt(hex.substring(4, 6), 16) / 255;
 
-        for (const i of pageOrder || pages.map((_, index) => index + 1)) {
-            const page = pages[i - 1];
-            const rotation = state.pageRotations.get(i);
-            const originalRotation = page.getRotation().angle;
-            const viewport = state.pageViewports.get(i);
-            const angle = degrees(viewport?.rotation || 0);
-            function pdfPoint(x, y) {
-                const [pdfX, pdfY] = viewport.convertToPdfPoint(x, viewport.height - y);
-                return { x: pdfX, y: pdfY };
+                page.drawRectangle({
+                    ...pdfPoint(el.x, el.y), width: el.w, height: el.h, rotate: angle,
+                    color: rgb(r, g, b), opacity: el.opacity, borderWidth: 0
+                });
             }
-            if (rotation !== undefined) page.setRotation(degrees((originalRotation + rotation) % 360));
-            const els = state.elements.get(i) || [];
+            else if (el.type === 'text') {
+                const hex = el.color.replace('#', '');
+                const r = parseInt(hex.substring(0, 2), 16) / 255;
+                const g = parseInt(hex.substring(2, 4), 16) / 255;
+                const b = parseInt(hex.substring(4, 6), 16) / 255;
 
-            for (const el of els) {
-                if (el.type === 'shape') {
-                    const hex = el.color.replace('#', '');
-                    const r = parseInt(hex.substring(0, 2), 16) / 255;
-                    const g = parseInt(hex.substring(2, 4), 16) / 255;
-                    const b = parseInt(hex.substring(4, 6), 16) / 255;
-
-                    page.drawRectangle({
-                        ...pdfPoint(el.x, el.y), width: el.w, height: el.h, rotate: angle,
-                        color: rgb(r, g, b), opacity: el.opacity, borderWidth: 0
+                const key = textFontKey(el.font);
+                if (!embeddedFonts.has(key)) {
+                    const font = await pdfDoc.embedFont(TEXT_FONTS[key].pdf);
+                    embeddedFonts.set(key, { font, supportedCharacters: new Set(font.getCharacterSet()) });
+                }
+                const { font, supportedCharacters } = embeddedFonts.get(key);
+                const supported = [...el.text].every(character => supportedCharacters.has(character.codePointAt(0)));
+                if (supported) {
+                    page.drawText(el.text, {
+                        ...pdfPoint(el.x, el.y), size: el.size, rotate: angle, font, color: rgb(r, g, b)
+                    });
+                } else {
+                    const { bytes, width, height, descent } = renderTextImage(el);
+                    page.drawImage(await pdfDoc.embedPng(bytes), {
+                        ...pdfPoint(el.x, el.y - descent), width, height, rotate: angle
                     });
                 }
-                else if (el.type === 'text') {
-                    const hex = el.color.replace('#', '');
-                    const r = parseInt(hex.substring(0, 2), 16) / 255;
-                    const g = parseInt(hex.substring(2, 4), 16) / 255;
-                    const b = parseInt(hex.substring(4, 6), 16) / 255;
+            }
+            else if (el.type === 'image') {
+                // Convert base64 to Uint8Array
+                const b64Data = el.src.split(',')[1];
+                const binStr = atob(b64Data);
+                const bytes = new Uint8Array(binStr.length);
+                for (let j = 0; j < binStr.length; j++) bytes[j] = binStr.charCodeAt(j);
 
-                    const key = textFontKey(el.font);
-                    if (!embeddedFonts.has(key)) {
-                        const font = await pdfDoc.embedFont(TEXT_FONTS[key].pdf);
-                        embeddedFonts.set(key, { font, supportedCharacters: new Set(font.getCharacterSet()) });
-                    }
-                    const { font, supportedCharacters } = embeddedFonts.get(key);
-                    const supported = [...el.text].every(character => supportedCharacters.has(character.codePointAt(0)));
-                    if (supported) {
-                        page.drawText(el.text, {
-                            ...pdfPoint(el.x, el.y), size: el.size, rotate: angle, font, color: rgb(r, g, b)
-                        });
-                    } else {
-                        const { bytes, width, height, descent } = renderTextImage(el);
-                        page.drawImage(await pdfDoc.embedPng(bytes), {
-                            ...pdfPoint(el.x, el.y - descent), width, height, rotate: angle
-                        });
-                    }
+                let img;
+                if (el.src.includes('image/png')) {
+                    img = await pdfDoc.embedPng(bytes);
+                } else {
+                    img = await pdfDoc.embedJpg(bytes);
                 }
-                else if (el.type === 'image') {
-                    // Convert base64 to Uint8Array
-                    const b64Data = el.src.split(',')[1];
-                    const binStr = atob(b64Data);
-                    const bytes = new Uint8Array(binStr.length);
-                    for (let j = 0; j < binStr.length; j++) bytes[j] = binStr.charCodeAt(j);
+                page.drawImage(img, { ...pdfPoint(el.x, el.y), width: el.w, height: el.h, rotate: angle });
+            }
+            else if (el.type === 'draw') {
+                const hex = el.color.replace('#', '');
+                const r = parseInt(hex.substring(0, 2), 16) / 255;
+                const g = parseInt(hex.substring(2, 4), 16) / 255;
+                const b = parseInt(hex.substring(4, 6), 16) / 255;
 
-                    let img;
-                    if (el.src.includes('image/png')) {
-                        img = await pdfDoc.embedPng(bytes);
-                    } else {
-                        img = await pdfDoc.embedJpg(bytes);
-                    }
-                    page.drawImage(img, { ...pdfPoint(el.x, el.y), width: el.w, height: el.h, rotate: angle });
-                }
-                else if (el.type === 'draw') {
-                    const hex = el.color.replace('#', '');
-                    const r = parseInt(hex.substring(0, 2), 16) / 255;
-                    const g = parseInt(hex.substring(2, 4), 16) / 255;
-                    const b = parseInt(hex.substring(4, 6), 16) / 255;
-
-                    for (let j = 1; j < el.path.length; j++) {
-                        page.drawLine({
-                            start: pdfPoint(el.path[j - 1].x, el.path[j - 1].y),
-                            end: pdfPoint(el.path[j].x, el.path[j].y),
-                            thickness: el.thickness,
-                            color: rgb(r, g, b)
-                        });
-                    }
+                for (let j = 1; j < el.path.length; j++) {
+                    page.drawLine({
+                        start: pdfPoint(el.path[j - 1].x, el.path[j - 1].y),
+                        end: pdfPoint(el.path[j].x, el.path[j].y),
+                        thickness: el.thickness,
+                        color: rgb(r, g, b)
+                    });
                 }
             }
         }
-
-        if (pageOrder && (pageOrder.length !== pages.length || pageOrder.some((number, index) => number !== index + 1))) {
-            for (let index = pages.length - 1; index >= 0; index--) pdfDoc.removePage(index);
-            pageOrder.forEach(number => pdfDoc.addPage(pages[number - 1]));
-        }
-        const finalBytes = await pdfDoc.save();
-        downloadBlob(new Blob([finalBytes], { type: 'application/pdf' }), `${fileStem()}-${pageOrder ? 'pages' : 'edited'}.pdf`);
-        setStatus('PDF downloaded successfully');
-
-    } catch (err) {
-        setStatus(`Could not save the PDF. ${err.message}`);
-    } finally {
-        loader.classList.add('hidden');
     }
+
+    if (pageOrder && (pageOrder.length !== pages.length || pageOrder.some((number, index) => number !== index + 1))) {
+        const seen = new Set();
+        const ordered = [];
+        for (const number of pageOrder) {
+            if (seen.has(number)) {
+                const [copy] = await pdfDoc.copyPages(pdfDoc, [number - 1]);
+                ordered.push(copy);
+            } else {
+                ordered.push(pages[number - 1]);
+                seen.add(number);
+            }
+        }
+        for (let index = pages.length - 1; index >= 0; index--) pdfDoc.removePage(index);
+        ordered.forEach(page => pdfDoc.addPage(page));
+    }
+    for (const file of appendFiles) {
+        const source = await PDFDocument.load(await file.arrayBuffer());
+        const appended = await pdfDoc.copyPages(source, source.getPageIndices());
+        appended.forEach(page => pdfDoc.addPage(page));
+    }
+    return pdfDoc.save();
 }
 
 init();

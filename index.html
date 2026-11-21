@@ -31,7 +31,7 @@
                 <button id="btnUndo" class="btn" title="Undo (Ctrl/Cmd + Z)" disabled><span aria-hidden="true">↶</span> Undo</button>
                 <button id="btnRedo" class="btn" title="Redo (Ctrl/Cmd + Shift + Z)" disabled><span aria-hidden="true">↷</span> Redo</button>
             </div>
-            <button id="btnSave" class="btn success" disabled>Save PDF</button>
+            <button id="btnSave" class="btn success" disabled>Save as</button>
         </div>
         <div class="toolbar-view">
             <div class="page-controls" aria-label="Page controls" role="group">
@@ -55,6 +55,8 @@
             </div>
             <div class="toolbar-options">
                 <button id="btnProperties" class="btn" aria-expanded="false" aria-controls="properties-sidebar">Properties</button>
+                <button id="btnRecent" class="btn" type="button">Recent</button>
+                <button id="btnFind" class="btn" type="button" disabled>Find</button>
                 <button id="btnVersions" class="btn" disabled>Versions</button>
                 <button id="btnPages" class="btn" disabled>Pages</button>
                 <button id="btnOrganize" class="btn organize" disabled>Auto-organize</button>
@@ -86,6 +88,7 @@
                 <h2>Drop a PDF here to start</h2>
                 <p>Open a document, then choose a tool to edit it privately in your browser.</p>
                 <button class="btn primary empty-action" id="btnChoose">Choose PDF</button>
+                <button class="btn empty-action" id="btnEmptyRecent">Recent files</button>
             </div>
         </section>
 
@@ -199,10 +202,12 @@
     </dialog>
     <dialog id="pageTools" class="compact-dialog" aria-labelledby="pageToolsTitle">
         <form id="pageToolsForm">
-            <header class="organizer-header"><h2 id="pageToolsTitle">Export pages</h2>
+            <header class="organizer-header"><h2 id="pageToolsTitle">Pages</h2>
                 <button type="button" class="btn" data-close>Close</button>
             </header>
             <p>Choose which pages to keep and the order they appear in the new PDF. Your edits are included.</p>
+            <ol id="pageThumbnails" aria-label="Pages in export order"></ol>
+            <label>Append PDFs<input id="appendPdfs" type="file" accept="application/pdf,.pdf" multiple></label>
             <label>Pages and order<input id="exportOrder" type="text" required aria-describedby="pageOrderHelp"></label>
             <p id="pageOrderHelp">Use commas or ranges, for example 3, 1–2. Leave out pages you want to remove.</p>
             <div class="dialog-actions">
@@ -211,6 +216,41 @@
                 <button class="btn primary">Download PDF</button>
             </div>
             <p id="pageExportError" role="alert"></p>
+        </form>
+    </dialog>
+    <dialog id="recentFiles" class="compact-dialog" aria-labelledby="recentTitle">
+        <header class="organizer-header"><h2 id="recentTitle">Recent PDFs</h2>
+            <form method="dialog"><button class="btn">Close</button></form>
+        </header>
+        <p class="dialog-note">This browser keeps the last 10 PDFs up to 25 MB each, with their latest edits. Clearing browser data removes these copies.</p>
+        <p id="recentStatus" role="status"></p>
+        <ul id="recentList"></ul>
+    </dialog>
+    <dialog id="saveAs" class="compact-dialog" aria-labelledby="saveAsTitle">
+        <form id="saveAsForm">
+            <header class="organizer-header"><h2 id="saveAsTitle">Save as</h2>
+                <button id="closeSaveAs" type="button" class="btn">Close</button>
+            </header>
+            <label>File name<input id="saveName" type="text" required></label>
+            <label>File format<select id="saveFormat">
+                <option value="pdf">PDF (.pdf)</option>
+                <option value="png">PNG image (.png)</option>
+                <option value="jpg">JPEG image (.jpg)</option>
+                <option value="txt">Plain text (.txt)</option>
+            </select></label>
+            <p id="saveFormatHelp"></p>
+            <div class="dialog-actions"><button class="btn primary">Download</button></div>
+        </form>
+    </dialog>
+    <dialog id="findPdf" class="compact-dialog" aria-labelledby="findPdfTitle">
+        <form id="findPdfForm">
+            <header class="organizer-header"><h2 id="findPdfTitle">Find in PDF</h2>
+                <button id="closeFind" type="button" class="btn">Close</button>
+            </header>
+            <label>Search text<input id="findPdfText" type="search" required></label>
+            <button class="btn primary">Find matches</button>
+            <p id="findPdfStatus" role="status"></p>
+            <ul id="findPdfResults"></ul>
         </form>
     </dialog>
     <dialog id="replaceText" class="compact-dialog" aria-labelledby="replaceTextTitle">
@@ -264,6 +304,8 @@
             <form method="dialog"><button class="btn">Close</button></form>
         </header>
         <ul class="release-notes">
+            <li><strong>Recent PDFs</strong> Reopen a local copy with your latest saved edits.</li>
+            <li><strong>Pages, Find, and Save as</strong> Manage pages visually, jump to matching text, and choose an export format.</li>
             <li><strong>Mobile editing</strong> Undo and Redo stay in the top toolbar and keep your place in the PDF.</li>
             <li><strong>Fonts and signatures</strong> Choose a font for text, or place a typed or hand-drawn signature.</li>
             <li><strong>Move PDF content</strong> Drag selectable text or pick up a page area, including artwork and scanned text.</li>
@@ -293,5 +335,6 @@
     <script src="versions.js"></script>
     <script src="install.js"></script>
     <script src="signature.js"></script>
+    <script src="workspace-tools.js"></script>
 </body>
 </html>

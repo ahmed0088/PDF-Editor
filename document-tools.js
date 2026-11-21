@@ -1,5 +1,10 @@
 const pageTools = document.getElementById('pageTools');
 const exportOrder = document.getElementById('exportOrder');
+const pageThumbnails = document.getElementById('pageThumbnails');
+const appendedDocuments = document.getElementById('appendPdfs');
+let thumbnailCache = new Map();
+let selectedPageOrder = [];
+let draggedPageIndex;
 const pageExportError = document.getElementById('pageExportError');
 const replaceTextDialog = document.getElementById('replaceText');
 const replacementValue = document.getElementById('replacementValue');
@@ -20,7 +25,7 @@ function allPageRange() {
 }
 
 function parsePageOrder(value, pageCount) {
-    const pages = new Set();
+    const pages = [];
     for (const part of value.split(',')) {
         const range = part.trim().match(/^(\d+)(?:\s*[-–]\s*(\d+))?$/);
         if (!range) throw new Error('Enter page numbers or ranges separated by commas.');
@@ -31,35 +36,149 @@ function parsePageOrder(value, pageCount) {
         }
         const step = first <= last ? 1 : -1;
         for (let number = first; ; number += step) {
-            if (pages.has(number)) throw new Error(`Page ${number} is listed more than once.`);
-            pages.add(number);
+            pages.push(number);
+            if (pages.length > Math.max(1000, pageCount * 2)) throw new Error('The export contains too many pages.');
             if (number === last) break;
         }
     }
-    return [...pages];
+    return pages;
+}
+
+function pageThumbnail(number) {
+    if (!thumbnailCache.has(number)) {
+        const source = viewer.querySelector(`[data-page-num="${number}"] > canvas`);
+        if (source?.width && source.height) {
+            const canvas = document.createElement('canvas');
+            const scale = Math.min(110 / source.width, 130 / source.height);
+            canvas.width = Math.max(1, Math.round(scale * source.width));
+            canvas.height = Math.max(1, Math.round(scale * source.height));
+            canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height);
+            thumbnailCache.set(number, canvas.toDataURL());
+        }
+    }
+    return thumbnailCache.get(number);
+}
+
+function moveExportPage(from, to) {
+    if (from === to) return;
+    const [page] = selectedPageOrder.splice(from, 1);
+    selectedPageOrder.splice(to, 0, page);
+    syncPageOrder();
+}
+
+function renderPageThumbnails() {
+    const desktop = matchMedia('(pointer: fine)').matches;
+    pageThumbnails.replaceChildren(...selectedPageOrder.map((number, index) => {
+        const row = document.createElement('li');
+        row.draggable = desktop;
+        row.addEventListener('dragstart', event => {
+            draggedPageIndex = index;
+            event.dataTransfer.setData('text/plain', String(number));
+            event.dataTransfer.effectAllowed = 'move';
+        });
+        row.addEventListener('dragend', () => { draggedPageIndex = undefined; });
+        row.addEventListener('dragover', event => {
+            if (draggedPageIndex !== undefined) event.preventDefault();
+        });
+        row.addEventListener('drop', event => {
+            event.preventDefault();
+            if (draggedPageIndex !== undefined) moveExportPage(draggedPageIndex, index);
+            draggedPageIndex = undefined;
+        });
+        const preview = document.createElement('button');
+        preview.type = 'button';
+        preview.className = 'page-preview';
+        preview.setAttribute('aria-label', `View original page ${number}`);
+        preview.addEventListener('click', () => {
+            pageTools.close();
+            goToPage(number);
+        });
+        const source = pageThumbnail(number);
+        if (source) {
+            const image = document.createElement('img');
+            image.src = source;
+            image.alt = '';
+            image.style.transform = `rotate(${state.pageRotations.get(number) || 0}deg)`;
+            preview.append(image);
+        }
+        const title = document.createElement('strong');
+        title.textContent = `Page ${number}`;
+        preview.append(title);
+        const actions = document.createElement('div');
+        actions.className = 'page-card-actions';
+        const controls = [
+            ['↑', 'Move up', index === 0, () => moveExportPage(index, index - 1)],
+            ['↓', 'Move down', index === selectedPageOrder.length - 1, () => moveExportPage(index, index + 1)],
+            ['↻', 'Rotate', false, () => {
+                rotatePage(number, 90);
+                renderPageThumbnails();
+            }],
+            ['＋', 'Duplicate', false, () => {
+                selectedPageOrder.splice(index, 0, number);
+                syncPageOrder();
+            }],
+            ['×', 'Remove', selectedPageOrder.length === 1, () => {
+                selectedPageOrder.splice(index, 1);
+                syncPageOrder();
+            }]
+        ];
+        for (const [symbol, label, disabled, action] of controls) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'btn';
+            button.textContent = symbol;
+            button.title = label;
+            button.setAttribute('aria-label', `${label} page ${number}`);
+            button.disabled = disabled;
+            button.addEventListener('click', action);
+            actions.append(button);
+        }
+        row.append(preview, actions);
+        return row;
+    }));
+}
+
+function syncPageOrder() {
+    exportOrder.value = selectedPageOrder.join(', ');
+    pageExportError.textContent = '';
+    renderPageThumbnails();
 }
 
 document.getElementById('btnPages').addEventListener('click', () => {
     pageExportError.textContent = '';
+    appendedDocuments.value = '';
+    thumbnailCache = new Map();
     exportOrder.value = allPageRange();
+    selectedPageOrder = parsePageOrder(exportOrder.value, state.pdfDoc.numPages);
+    renderPageThumbnails();
     pageTools.showModal();
-    exportOrder.select();
 });
 document.getElementById('exportCurrent').addEventListener('click', () => {
-    exportOrder.value = state.currentPage;
-    pageExportError.textContent = '';
+    selectedPageOrder = [state.currentPage];
+    syncPageOrder();
 });
 document.getElementById('exportAll').addEventListener('click', () => {
     exportOrder.value = allPageRange();
+    selectedPageOrder = parsePageOrder(exportOrder.value, state.pdfDoc.numPages);
     pageExportError.textContent = '';
+    renderPageThumbnails();
 });
-exportOrder.addEventListener('input', () => { pageExportError.textContent = ''; });
+exportOrder.addEventListener('change', () => {
+    try {
+        selectedPageOrder = parsePageOrder(exportOrder.value, state.pdfDoc.numPages);
+        pageExportError.textContent = '';
+        renderPageThumbnails();
+    } catch (error) {
+        pageExportError.textContent = error.message;
+    }
+});
 document.getElementById('pageToolsForm').addEventListener('submit', event => {
     event.preventDefault();
     try {
         const order = parsePageOrder(exportOrder.value, state.pdfDoc.numPages);
+        const appendFiles = [...appendedDocuments.files];
         pageTools.close();
-        savePDF(order);
+        exportDocument({ name: `${fileStem()}-pages`, order, appendFiles });
     } catch (error) {
         pageExportError.textContent = error.message;
     }

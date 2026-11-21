@@ -528,3 +528,56 @@ button, label { user-select: none; }
     #statusbar { flex-wrap: wrap; gap: 0 10px; }
     #statusText { flex-basis: 100%; padding-top: 4px; }
 }
+
+#pageTools { width: min(650px, calc(100% - 24px)); }
+#pageThumbnails {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+    gap: 8px;
+    max-height: 40dvh;
+    overflow: auto;
+    padding: 2px;
+    list-style: none;
+}
+#pageThumbnails li { min-width: 0; padding: 7px; border-radius: 10px; background: #1b2844; }
+.page-preview {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    min-height: 126px;
+    padding: 5px;
+    color: var(--text);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+}
+.page-preview img { display: block; width: auto; height: 100px; max-width: 90%; object-fit: contain; }
+.page-card-actions { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; }
+.page-card-actions .btn { padding: 4px 0; min-height: 36px; font-size: .95rem; }
+#recentList, #findPdfResults { display: grid; gap: 6px; list-style: none; max-height: 50dvh; overflow: auto; }
+#recentList li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    border-bottom: 1px solid var(--line);
+    padding: 8px 2px;
+    overflow-wrap: anywhere;
+}
+#recentList small { display: block; margin-top: 3px; color: var(--muted); }
+.recent-actions { display: flex; gap: 5px; }
+#findPdfResults .btn { justify-content: flex-start; width: 100%; text-align: start; overflow-wrap: anywhere; }
+#findPdfResults strong { flex: none; color: #c5ceff; }
+.find-hit { position: absolute; z-index: 15; transform-origin: left bottom; border: 1px solid #d59a00; background: #ffc84348; pointer-events: none; }
+@media (max-width: 620px) {
+    #pageTools { margin: auto auto 0; width: 100%; border-radius: 20px 20px 0 0; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+    #pageThumbnails { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+}
+
+#properties-sidebar .prop-group { display: none; }
+#properties-sidebar[data-mode="text"] #prop-text,
+#properties-sidebar[data-mode="shape"] #prop-shape,
+#properties-sidebar[data-mode="draw"] #prop-draw { display: flex; }

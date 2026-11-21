@@ -1,8 +1,8 @@
 const prefix = 'pro-pdf-editor-';
-const cacheName = prefix + '2026-11-21-1';
+const cacheName = prefix + '2026-11-21-2';
 const shell = [
     './', './index.html', './style.css', './app.js', './organizer.js', './document-tools.js',
-    './versions.js', './install.js', './fonts.js', './signature.js', './allura-latin.woff2', './manifest.webmanifest', './favicon.svg', './icon-192.png', './icon-512.png',
+    './versions.js', './workspace-tools.js', './install.js', './fonts.js', './signature.js', './allura-latin.woff2', './manifest.webmanifest', './favicon.svg', './icon-192.png', './icon-512.png',
     './vendor/pdf.min.js', './vendor/pdf.worker.min.js', './vendor/pdf-lib.min.js'
 ].map(path => new URL(path, self.registration.scope).href);
 const cachedAssets = new Set(shell);

@@ -55,3 +55,11 @@ On phones, **Undo** and **Redo** sit between **Open PDF** and **Save PDF**. They
 The phone toolbar keeps Open, Undo, Redo and Save at the top. Use **More** for zoom, rotation, Properties, Versions, Pages and Auto-organize. The PDF libraries are served with the editor and cached for offline use.
 
 **Check & restart** checks for a fresh app build before reloading. It asks before closing an open PDF and leaves the session open if the update check fails.
+
+## Recent files, Find and export formats
+
+**Recent** reopens a browser-local copy of the original PDF and its latest draft. The list keeps up to 10 PDFs of 25 MB or less. The original disk file and named **Versions** remain separate. Browser storage may be cleared by the browser or manually, so download important copies.
+
+**Save as** supports PDF for the full edited document, PNG or JPEG for the active page, and TXT for selectable text and text annotations. A visual cover leaves underlying source text available to text exports.
+
+In **Pages**, use the thumbnails to move, rotate, duplicate, or remove pages, or append other PDFs. The page order applies to the exported copy. Rotating a page applies to each duplicate of that page. **Find** searches selectable original text and jumps to matching pages. Image-only scans still require OCR.

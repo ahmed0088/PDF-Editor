@@ -10,12 +10,23 @@ let versionDialogSession = 0;
 function openVersionDatabase() {
     if (!versionDatabase) {
         versionDatabase = new Promise((resolve, reject) => {
-            const request = indexedDB.open('pdf-editor-versions', 1);
+            const request = indexedDB.open('pdf-editor-versions', 2);
             request.onupgradeneeded = () => {
-                const store = request.result.createObjectStore('versions', { keyPath: 'id', autoIncrement: true });
-                store.createIndex('documentKey', 'documentKey');
+                const database = request.result;
+                if (!database.objectStoreNames.contains('versions')) {
+                    database.createObjectStore('versions', { keyPath: 'id', autoIncrement: true }).createIndex('documentKey', 'documentKey');
+                }
+                database.createObjectStore('recent');
+                database.createObjectStore('recentBytes');
             };
-            request.onsuccess = () => resolve(request.result);
+            request.onsuccess = () => {
+                const database = request.result;
+                database.onversionchange = () => {
+                    database.close();
+                    versionDatabase = null;
+                };
+                resolve(database);
+            };
             request.onerror = () => reject(request.error);
         }).catch(error => {
             versionDatabase = null;
@@ -25,11 +36,11 @@ function openVersionDatabase() {
     return versionDatabase;
 }
 
-async function versionTransaction(mode, operation) {
+async function versionTransaction(mode, operation, storeName = 'versions') {
     const database = await openVersionDatabase();
     return new Promise((resolve, reject) => {
-        const transaction = database.transaction('versions', mode);
-        const request = operation(transaction.objectStore('versions'));
+        const transaction = database.transaction(storeName, mode);
+        const request = operation(transaction.objectStore(storeName));
         transaction.oncomplete = () => resolve(request.result);
         transaction.onabort = () => reject(transaction.error || new Error('Storage operation was interrupted.'));
     });
