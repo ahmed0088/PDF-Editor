@@ -242,6 +242,28 @@ async function authenticate(action) {
     }
 }
 
+document.getElementById('cloudGoogle').addEventListener('click', async () => {
+    if (!firebaseClient || cloudBusy) return;
+    cloudBusy = true;
+    updateCloudControls();
+    cloudFeedback.textContent = '';
+    try {
+        await firebaseClient.signInWithGoogle();
+    } catch (error) {
+        const messages = {
+            'auth/popup-blocked': 'Allow pop-ups for PDF Editor, then try Google sign-in again.',
+            'auth/popup-closed-by-user': 'Google sign-in was closed. You can start it again.',
+            'auth/unauthorized-domain': 'Add ahmed0088.github.io to Firebase Authentication’s authorized domains.',
+            'auth/operation-not-allowed': 'Enable the Google provider in Firebase Authentication.',
+            'auth/account-exists-with-different-credential': 'An account with this email already uses another sign-in method.'
+        };
+        cloudFeedback.textContent = messages[error.code] || 'Google sign-in could not finish. Try again.';
+    } finally {
+        cloudBusy = false;
+        updateCloudControls();
+    }
+});
+
 cloudLogin.addEventListener('submit', event => { event.preventDefault(); authenticate('signIn'); });
 document.getElementById('cloudCreate').addEventListener('click', () => authenticate('registerAccount'));
 document.getElementById('cloudReset').addEventListener('click', () => authenticate('resetPassword'));

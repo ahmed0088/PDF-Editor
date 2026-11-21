@@ -856,49 +856,78 @@ function updateUndoRedoButtons() {
 }
 
 // --- Image Upload ---
-imageInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+async function readPdfImage(file) {
+    const header = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+    const png = [137, 80, 78, 71, 13, 10, 26, 10].every((value, index) => header[index] === value);
+    const jpeg = header[0] === 255 && header[1] === 216 && header[2] === 255;
+    if (!png && !jpeg) throw new Error('Choose a PNG or JPEG image.');
+    const src = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('The image could not be read.'));
+        reader.readAsDataURL(file.slice(0, file.size, png ? 'image/png' : 'image/jpeg'));
+    });
+    const dimensions = await new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
+        image.onerror = () => reject(new Error('The image could not be opened.'));
+        image.src = src;
+    });
+    return { src, ...dimensions };
+}
 
+function fitImageInBox(image, box) {
+    const scale = Math.min(box.w / image.width, box.h / image.height);
+    const w = image.width * scale;
+    const h = image.height * scale;
+    return { type: 'image', src: image.src, w, h, x: box.x + (box.w - w) / 2, y: box.y + (box.h - h) / 2 };
+}
+
+imageInput.addEventListener('change', async () => {
+    const file = imageInput.files[0];
+    imageInput.value = '';
+    if (!file || !state.pdfDoc) return;
     const pdf = state.pdfDoc;
-    const pageNumberToEdit = state.currentPage;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-            if (state.pdfDoc === pdf && pdf) {
-                const wrapper = document.querySelector(`.page-wrapper[data-page-num="${pageNumberToEdit}"]`);
-                if (!wrapper) return;
+    const page = state.currentPage;
+    try {
+        const image = await readPdfImage(file);
+        if (state.pdfDoc !== pdf) return;
+        const wrapper = viewer.querySelector(`[data-page-num="${page}"]`);
+        if (!wrapper) return;
+        const { width, height, scale } = wrapper.pdfViewport;
+        const pdfWidth = width / scale;
+        const pdfHeight = height / scale;
+        const w = Math.min(pdfWidth * 0.2, image.width / scale);
+        const h = Math.min(pdfHeight * 0.2, image.height / scale);
+        saveState(fitImageInBox(image, { w, h, x: (pdfWidth - w) / 2, y: (pdfHeight - h) / 2 }), page, wrapper);
+        setStatus('Image added');
+    } catch (error) {
+        setStatus(error.message);
+    }
+});
 
-                const scale = state.scale;
-                const pdfWidth = wrapper.clientWidth / scale;
-                const pdfHeight = wrapper.clientHeight / scale;
-
-                // Scale image down to max 20% of page size
-                const maxW = pdfWidth * 0.2;
-                const maxH = pdfHeight * 0.2;
-                let w = img.width / scale;
-                let h = img.height / scale;
-
-                if (w > maxW) { h *= maxW / w; w = maxW; }
-                if (h > maxH) { w *= maxH / h; h = maxH; }
-
-                const newElData = {
-                    type: 'image',
-                    src: event.target.result,
-                    x: (pdfWidth - w) / 2,
-                    y: (pdfHeight - h) / 2,
-                    w: w,
-                    h: h
-                };
-
-                saveState(newElData, pageNumberToEdit, wrapper);
-            }
-        };
-        img.src = event.target.result;
-    };
-    reader.readAsDataURL(file);
-    imageInput.value = ''; // Reset input
+const replaceAddedImage = document.getElementById('replaceAddedImage');
+replaceAddedImage.addEventListener('change', async () => {
+    const file = replaceAddedImage.files[0];
+    replaceAddedImage.value = '';
+    const element = state.selectedEl;
+    const data = element?.stateData;
+    if (!file || data?.type !== 'image') return;
+    try {
+        const image = await readPdfImage(file);
+        const wrapper = element.parentElement;
+        if (!wrapper?.isConnected || state.selectedEl !== element) return;
+        const page = Number(element.dataset.page);
+        const replacement = { ...data, ...fitImageInBox(image, data) };
+        updateStateData(replacement, page, data);
+        const updated = createDOMElement(replacement, wrapper, page, wrapper.pdfViewport);
+        element.replaceWith(updated);
+        setSelection(updated);
+        saveHistory();
+        setStatus('Image replaced');
+    } catch (error) {
+        setStatus(error.message);
+    }
 });
 
 // --- Buttons & Shortcuts ---

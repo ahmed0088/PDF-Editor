@@ -1,7 +1,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import {
     getAuth, onAuthStateChanged, signInWithEmailAndPassword,
-    createUserWithEmailAndPassword, sendPasswordResetEmail, signOut
+    createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, GoogleAuthProvider, signInWithPopup
 } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 
 // Firebase web configuration identifies the project. Access is enforced by Firebase Authentication and database rules.
@@ -21,3 +21,5 @@ export const signIn = (email, password) => signInWithEmailAndPassword(auth, emai
 export const registerAccount = (email, password) => createUserWithEmailAndPassword(auth, email, password);
 export const resetPassword = email => sendPasswordResetEmail(auth, email);
 export const logOut = () => signOut(auth);
+
+export const signInWithGoogle = () => signInWithPopup(auth, new GoogleAuthProvider());

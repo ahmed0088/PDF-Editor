@@ -689,3 +689,13 @@ button, label { user-select: none; }
     :root:is([data-theme="dark"], [data-theme="night"]) #tool-sidebar .tool-btn.active { background: #293a75; color: #fff; }
     :root:is([data-theme="dark"], [data-theme="night"]) #statusbar .status-link { color: #afbaff; }
 }
+
+#properties-sidebar[data-mode="image"] #prop-image { display: flex; }
+.file-picker > input[type="file"] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}

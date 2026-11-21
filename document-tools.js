@@ -13,6 +13,8 @@ populateFontPicker(replacementFont);
 replacementFont.addEventListener('change', () => applyTextFont(replacementValue, replacementFont.value));
 const replacementBackground = document.getElementById('replacementBackground');
 const pickUpArea = document.getElementById('pickUpArea');
+const replaceAreaImage = document.getElementById('replaceAreaImage');
+let loadingReplacementImage = false;
 const replaceError = document.getElementById('replaceError');
 let sourceSelection;
 
@@ -274,6 +276,7 @@ clearSelectedSource.addEventListener('click', () => {
 function openAreaEditor(selection, value = '') {
     if (replaceTextDialog.open) return;
     sourceSelection = selection;
+    replaceAreaImage.value = '';
     replacementValue.value = value;
     replacementFont.value = propertyInputs.textFont.value;
     applyTextFont(replacementValue, replacementFont.value);
@@ -308,10 +311,10 @@ function commitAreaEdits(edits) {
     const updatedPages = new Map();
     const moving = edits.some(({ overlay }) => overlay?.type === 'image');
     const focusedSource = document.activeElement?.closest('.source-text-targets');
-    for (const { selection, overlay, background } of edits) {
+    for (const { selection, overlay, background, replaceSource } of edits) {
         const { wrapper, pageNum, box } = selection;
         if (!wrapper.isConnected) continue;
-        const cover = { ...box, type: 'shape', color: background, opacity: 1, sourceMask: true, sourceRemoval: !overlay };
+        const cover = { ...box, type: 'shape', color: background, opacity: 1, sourceMask: true, sourceRemoval: !overlay || Boolean(replaceSource) };
         const elements = state.elements.get(pageNum) || [];
         elements.push(cover);
         if (overlay) elements.push(overlay);
@@ -503,7 +506,7 @@ async function addSourceTextTargets(wrapper) {
 
 const removeSourceArea = document.getElementById('removeSourceArea');
 function removeCurrentSourceArea() {
-    if (pickUpArea.disabled || !replaceTextDialog.open) return;
+    if (pickUpArea.disabled || loadingReplacementImage || !replaceTextDialog.open) return;
     applyAreaEdit(sourceSelection, null, replacementBackground.value);
     setStatus('Content covered. Save as a flattened PDF to leave out the original text.');
 }
@@ -526,7 +529,7 @@ function bindDialogTap(button, action) {
 bindDialogTap(removeSourceArea, removeCurrentSourceArea);
 
 async function pickUpFromDialog() {
-    if (pickUpArea.disabled || !replaceTextDialog.open) return;
+    if (pickUpArea.disabled || loadingReplacementImage || !replaceTextDialog.open) return;
     pickUpArea.disabled = true;
     try {
         await pickUpSelection(sourceSelection, replacementBackground.value);
@@ -537,9 +540,33 @@ async function pickUpFromDialog() {
 
 bindDialogTap(pickUpArea, pickUpFromDialog);
 
+replaceAreaImage.addEventListener('change', async () => {
+    const file = replaceAreaImage.files[0];
+    replaceAreaImage.value = '';
+    const selection = sourceSelection;
+    if (!file || !selection || loadingReplacementImage || pickUpArea.disabled) return;
+    loadingReplacementImage = true;
+    replaceAreaImage.disabled = true;
+    replaceError.textContent = '';
+    try {
+        const image = await readPdfImage(file);
+        if (!replaceTextDialog.open || sourceSelection !== selection || !selection.wrapper.isConnected) return;
+        commitAreaEdits([{
+            selection, overlay: fitImageInBox(image, selection.box),
+            background: replacementBackground.value, replaceSource: true
+        }]);
+        setStatus('Image replaced. Drag or resize it, then save a flattened PDF to omit the original.');
+    } catch (error) {
+        if (replaceTextDialog.open && sourceSelection === selection) replaceError.textContent = error.message;
+    } finally {
+        replaceAreaImage.disabled = false;
+        loadingReplacementImage = false;
+    }
+});
+
 document.getElementById('replaceTextForm').addEventListener('submit', event => {
     event.preventDefault();
-    if (pickUpArea.disabled) return;
+    if (pickUpArea.disabled || loadingReplacementImage) return;
     const value = replacementValue.value.trim();
     if (!value) {
         replaceError.textContent = 'Enter replacement text or choose Pick up area.';

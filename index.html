@@ -122,6 +122,11 @@
                 <input type="range" id="opacity" min="0.1" max="1" step="0.1" value="1">
             </div>
 
+            <div class="prop-group" id="prop-image">
+                <label class="btn file-picker">Replace image
+                    <input id="replaceAddedImage" type="file" accept="image/png,image/jpeg" aria-label="Replace selected image">
+                </label>
+            </div>
             <div class="prop-group" id="prop-draw">
                 <label>Pen Color</label>
                 <input type="color" id="penColor" value="#000000">
@@ -243,6 +248,7 @@
         </header>
         <p id="cloudConnection" class="dialog-note" role="status">Signed out</p>
         <form id="cloudLogin" hidden>
+            <button id="cloudGoogle" class="btn" type="button">Continue with Google</button>
             <label>Email<input id="cloudEmail" type="email" required autocomplete="username"></label>
             <label>Password<input id="cloudPassword" type="password" required autocomplete="current-password"></label>
             <div class="dialog-actions">
@@ -307,8 +313,10 @@
             <label>Replacement text<input id="replacementValue" type="text" dir="auto"></label>
             <label>Font<select id="replacementFont"></select></label>
             <label>Background color<input id="replacementBackground" type="color" value="#ffffff"></label>
-            <p>Remove, move, or replace this content. Export as a flattened PDF to leave out the covered source text.</p>
-            <div class="dialog-actions"><button type="button" id="removeSourceArea" class="btn danger">Remove from page</button><button type="button" id="pickUpArea" class="btn">Pick up area</button><button type="submit" class="btn primary">Apply replacement</button></div>
+            <p>Remove, move, or replace this content. Use a flattened PDF to leave out the covered original.</p>
+            <div class="dialog-actions"><button type="button" id="removeSourceArea" class="btn danger">Remove from page</button><label class="btn file-picker" id="replaceAreaImageLabel">Replace with image
+                    <input type="file" id="replaceAreaImage" accept="image/png,image/jpeg" aria-label="Replace area with PNG or JPEG">
+                </label><button type="button" id="pickUpArea" class="btn">Pick up area</button><button type="submit" class="btn primary">Apply replacement</button></div>
             <p id="replaceError" role="alert"></p>
         </form>
     </dialog>
