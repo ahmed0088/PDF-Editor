@@ -178,7 +178,10 @@ document.getElementById('pageToolsForm').addEventListener('submit', event => {
         const order = parsePageOrder(exportOrder.value, state.pdfDoc.numPages);
         const appendFiles = [...appendedDocuments.files];
         pageTools.close();
-        exportDocument({ name: `${fileStem()}-pages`, order, appendFiles });
+        exportDocument({
+            name: `${fileStem()}-pages`, order, appendFiles,
+            format: hasSourceRemoval(order) ? 'flat' : 'pdf'
+        });
     } catch (error) {
         pageExportError.textContent = error.message;
     }
@@ -205,27 +208,29 @@ function areaSelection(wrapper, rect, text) {
 }
 
 function openAreaEditor(selection, value = '') {
+    if (replaceTextDialog.open) return;
     sourceSelection = selection;
     replacementValue.value = value;
     replacementFont.value = propertyInputs.textFont.value;
     applyTextFont(replacementValue, replacementFont.value);
     replacementBackground.value = pageBackground(selection.wrapper, selection.rect);
     replaceError.textContent = '';
-    document.getElementById('replaceTextTitle').textContent = value ? 'Edit PDF text' : 'Move or replace area';
+    document.getElementById('replaceTextTitle').textContent = value ? 'Edit PDF text' : 'Edit page area';
     replaceTextDialog.showModal();
     if (value) replacementValue.select();
-    else pickUpArea.focus({ preventScroll: true });
+    else document.getElementById('removeSourceArea').focus({ preventScroll: true });
 }
 
 function applyAreaEdit(selection, overlay, background) {
     const { wrapper, pageNum, box } = selection;
     if (!wrapper.isConnected) return;
-    const cover = { ...box, type: 'shape', color: background, opacity: 1 };
+    const cover = { ...box, type: 'shape', color: background, opacity: 1, sourceRemoval: !overlay };
     const elements = state.elements.get(pageNum) || [];
-    elements.push(cover, overlay);
+    elements.push(cover);
+    if (overlay) elements.push(overlay);
     state.elements.set(pageNum, elements);
-    createDOMElement(cover, wrapper, pageNum, wrapper.pdfViewport);
-    const selected = createDOMElement(overlay, wrapper, pageNum, wrapper.pdfViewport);
+    const coverElement = createDOMElement(cover, wrapper, pageNum, wrapper.pdfViewport);
+    const selected = overlay ? createDOMElement(overlay, wrapper, pageNum, wrapper.pdfViewport) : coverElement;
     state.currentPage = pageNum;
     state.tool = 'select';
     if (replaceTextDialog.open) replaceTextDialog.close();
@@ -341,6 +346,8 @@ async function addSourceTextTargets(wrapper) {
             target.setAttribute('aria-label', `Edit text: ${item.str.trim()}`);
             Object.assign(target.style, { left: `${rect.left}px`, top: `${rect.top}px`,
                 width: `${rect.right - rect.left}px`, height: `${rect.bottom - rect.top}px` });
+            // Short labels should receive the tap when an oversized text run overlaps them.
+            target.style.zIndex = String(Math.max(1, Math.round(100000 / ((rect.right - rect.left) * (rect.bottom - rect.top)))));
             let start;
             let moved = false;
             target.addEventListener('pointerdown', event => {
@@ -362,6 +369,7 @@ async function addSourceTextTargets(wrapper) {
                 start = null;
                 target.style.transform = '';
                 if (moved) pickUpSelection(selection, pageBackground(wrapper, rect), event.clientX - x, event.clientY - y);
+                else if (event.pointerType === 'touch') openAreaEditor(selection, item.str.trim());
             });
             target.addEventListener('pointercancel', () => {
                 start = null;
@@ -383,6 +391,30 @@ async function addSourceTextTargets(wrapper) {
     }
 }
 
+const removeSourceArea = document.getElementById('removeSourceArea');
+function removeCurrentSourceArea() {
+    if (pickUpArea.disabled || !replaceTextDialog.open) return;
+    applyAreaEdit(sourceSelection, null, replacementBackground.value);
+    setStatus('Content covered. Save as a flattened PDF to leave out the original text.');
+}
+
+function bindDialogTap(button, action) {
+    let start;
+    button.addEventListener('click', action);
+    button.addEventListener('pointerdown', event => {
+        if (event.pointerType === 'touch') start = event;
+    });
+    button.addEventListener('pointercancel', () => { start = null; });
+    button.addEventListener('pointerup', event => {
+        const touch = start;
+        start = null;
+        if (touch?.pointerId === event.pointerId &&
+            Math.hypot(event.clientX - touch.clientX, event.clientY - touch.clientY) < 8) action();
+    });
+}
+
+bindDialogTap(removeSourceArea, removeCurrentSourceArea);
+
 async function pickUpFromDialog() {
     if (pickUpArea.disabled || !replaceTextDialog.open) return;
     pickUpArea.disabled = true;
@@ -393,19 +425,7 @@ async function pickUpFromDialog() {
     }
 }
 
-pickUpArea.addEventListener('click', pickUpFromDialog);
-let pickupTouchStart;
-pickUpArea.addEventListener('pointerdown', event => {
-    if (event.pointerType === 'touch') pickupTouchStart = event;
-});
-pickUpArea.addEventListener('pointercancel', () => { pickupTouchStart = null; });
-pickUpArea.addEventListener('pointerup', event => {
-    const start = pickupTouchStart;
-    pickupTouchStart = null;
-    if (start?.pointerId === event.pointerId && Math.hypot(event.clientX - start.clientX, event.clientY - start.clientY) < 8) {
-        pickUpFromDialog();
-    }
-});
+bindDialogTap(pickUpArea, pickUpFromDialog);
 
 document.getElementById('replaceTextForm').addEventListener('submit', event => {
     event.preventDefault();

@@ -75,6 +75,7 @@ function goToPage(page) {
 function setSelection(element) {
     document.querySelectorAll('.editor-element').forEach(el => el.classList.remove('selected'));
     state.selectedEl = element || null;
+    propertyInputs.opacity.disabled = Boolean(element?.elData?.sourceRemoval);
     updatePropertyGroups();
     if (element) {
         element.classList.add('selected');
@@ -119,7 +120,10 @@ function updateSelectedProperty(name, value) {
     if (name === 'fontSize' && data.type === 'text') data.size = Math.max(6, Math.min(72, Number(value) || 12));
     if (name === 'textColor' && data.type === 'text') data.color = value;
     if (name === 'shapeColor' && data.type === 'shape') data.color = value;
-    if (name === 'opacity' && data.type === 'shape') data.opacity = Number(value);
+    if (name === 'opacity' && data.type === 'shape') {
+        if (data.sourceRemoval) return;
+        data.opacity = Number(value);
+    }
     const wrapper = selected.parentElement;
     const replacement = createDOMElement(data, wrapper, Number(selected.dataset.page), wrapper.pdfViewport);
     selected.replaceWith(replacement);
@@ -582,6 +586,7 @@ function createDOMElement(elData, container, pageNum, viewport) {
     const div = document.createElement('div');
     div.className = 'editor-element';
     div.dataset.page = pageNum;
+    if (elData.sourceRemoval) div.classList.add('source-removal');
 
     if (elData.type === 'text') {
         div.classList.add('el-text');
@@ -633,7 +638,7 @@ function createDOMElement(elData, container, pageNum, viewport) {
     }
 
     // Add resize handle for shapes/images
-    if (elData.type === 'shape' || elData.type === 'image') {
+    if ((elData.type === 'shape' || elData.type === 'image') && !elData.sourceRemoval) {
         const handle = document.createElement('div');
         handle.className = 'resize-handle';
         div.appendChild(handle);
@@ -651,7 +656,7 @@ function createDOMElement(elData, container, pageNum, viewport) {
 
         state.currentPage = pageNum;
         updatePageControls();
-        startElementDrag(e, div, e.target.classList.contains('resize-handle'));
+        if (!elData.sourceRemoval) startElementDrag(e, div, e.target.classList.contains('resize-handle'));
     });
 
     if (elData.type === 'text') {

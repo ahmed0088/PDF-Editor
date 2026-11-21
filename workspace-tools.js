@@ -131,17 +131,21 @@ document.getElementById('btnEmptyRecent').addEventListener('click', openRecentDo
 
 const exportHelp = {
     pdf: 'Download the whole PDF with your edits.',
+    flat: 'Save rendered pages only. Covered text is left out, and pages become images with no selectable text, forms, or links.',
     png: 'Download the current page, including edits, as a PNG image.',
     jpg: 'Download the current page, including edits, as a JPEG image.',
     txt: 'Download selectable source text and text annotations. Scans, images, and visual covers are not applied.'
 };
 function updateExportHelp() {
-    document.getElementById('saveFormatHelp').textContent = exportHelp[saveFormat.value];
+    const help = exportHelp[saveFormat.value];
+    const warning = saveFormat.value === 'pdf' && hasSourceRemoval()
+        ? ' Covered source text remains in this format.' : '';
+    document.getElementById('saveFormatHelp').textContent = help + warning;
 }
 btnSave.addEventListener('click', () => {
     if (!state.pdfDoc) return;
     saveName.value = fileStem();
-    saveFormat.value = 'pdf';
+    saveFormat.value = hasSourceRemoval() ? 'flat' : 'pdf';
     updateExportHelp();
     saveDialog.showModal();
 });
@@ -153,15 +157,51 @@ function downloadName(stem, extension) {
     return `${clean || fileStem()}.${extension}`;
 }
 
+function hasSourceRemoval(order) {
+    return [...state.elements].some(([page, elements]) =>
+        (!order || order.includes(page)) && elements.some(element => element.sourceRemoval));
+}
+
+async function renderExportPage(page, annotations = true) {
+    const base = page.getViewport({ scale: 1 });
+    const viewport = page.getViewport({ scale: Math.min(2, Math.sqrt(12000000 / (base.width * base.height))) });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    await page.render({
+        canvasContext: canvas.getContext('2d'), viewport, background: '#ffffff',
+        annotationMode: annotations ? pdfjsLib.AnnotationMode.ENABLE : pdfjsLib.AnnotationMode.DISABLE
+    }).promise;
+    return { canvas, base };
+}
+
+async function flattenPDF(source, loaderText) {
+    const flattened = await PDFLib.PDFDocument.create();
+    for (let number = 1; number <= source.numPages; number++) {
+        loaderText.textContent = `Flattening page ${number} of ${source.numPages}…`;
+        const { canvas, base } = await renderExportPage(await source.getPage(number), false);
+        const image = await flattened.embedPng(canvas.toDataURL('image/png'));
+        const page = flattened.addPage([base.width, base.height]);
+        page.drawImage(image, { x: 0, y: 0, width: base.width, height: base.height });
+        canvas.width = canvas.height = 0;
+    }
+    return flattened.save();
+}
+
 async function exportDocument({ format = 'pdf', name = fileStem(), order, appendFiles } = {}) {
     if (!state.pdfDoc || !loader.classList.contains('hidden')) return;
-    loaderText.textContent = `Preparing ${format.toUpperCase()}…`;
+    const extension = format === 'flat' ? 'pdf' : format;
+    loaderText.textContent = `Preparing ${extension.toUpperCase()}…`;
     loader.classList.remove('hidden');
     let renderedDocument;
     try {
         let blob;
         if (format === 'pdf') {
             blob = new Blob([await buildEditedPDF(order, appendFiles)], { type: 'application/pdf' });
+        } else if (format === 'flat') {
+            const bytes = await buildEditedPDF(order, appendFiles);
+            renderedDocument = await pdfjsLib.getDocument({ data: bytes, isEvalSupported: false }).promise;
+            blob = new Blob([await flattenPDF(renderedDocument, loaderText)], { type: 'application/pdf' });
         } else if (format === 'txt') {
             const blocks = [];
             for (let i = 1; i <= state.pdfDoc.numPages; i++) {
@@ -175,18 +215,12 @@ async function exportDocument({ format = 'pdf', name = fileStem(), order, append
         } else {
             const bytes = await buildEditedPDF([state.currentPage]);
             renderedDocument = await pdfjsLib.getDocument({ data: bytes, isEvalSupported: false }).promise;
-            const page = await renderedDocument.getPage(1);
-            const base = page.getViewport({ scale: 1 });
-            const viewport = page.getViewport({ scale: Math.min(2, Math.sqrt(12000000 / (base.width * base.height))) });
-            const canvas = document.createElement('canvas');
-            canvas.width = Math.ceil(viewport.width);
-            canvas.height = Math.ceil(viewport.height);
-            await page.render({ canvasContext: canvas.getContext('2d'), viewport, background: '#ffffff' }).promise;
+            const { canvas } = await renderExportPage(await renderedDocument.getPage(1));
             blob = await new Promise(resolve => canvas.toBlob(resolve, format === 'jpg' ? 'image/jpeg' : 'image/png', .92));
             if (!blob) throw new Error('The browser could not create the image.');
         }
-        downloadBlob(blob, downloadName(name, format));
-        setStatus(`${format.toUpperCase()} downloaded`);
+        downloadBlob(blob, downloadName(name, extension));
+        setStatus(format === 'flat' ? 'Flattened PDF downloaded' : `${extension.toUpperCase()} downloaded`);
     } catch (error) {
         setStatus(`Could not export the document. ${error.message}`);
     } finally {

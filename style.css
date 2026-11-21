@@ -581,3 +581,5 @@ button, label { user-select: none; }
 #properties-sidebar[data-mode="text"] #prop-text,
 #properties-sidebar[data-mode="shape"] #prop-shape,
 #properties-sidebar[data-mode="draw"] #prop-draw { display: flex; }
+
+.editor-element.source-removal { cursor: pointer; }

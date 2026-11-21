@@ -233,7 +233,8 @@
             </header>
             <label>File name<input id="saveName" type="text" required></label>
             <label>File format<select id="saveFormat">
-                <option value="pdf">PDF (.pdf)</option>
+                <option value="pdf">Editable PDF (.pdf)</option>
+                <option value="flat">Flattened PDF (.pdf)</option>
                 <option value="png">PNG image (.png)</option>
                 <option value="jpg">JPEG image (.jpg)</option>
                 <option value="txt">Plain text (.txt)</option>
@@ -261,8 +262,8 @@
             <label>Replacement text<input id="replacementValue" type="text" dir="auto"></label>
             <label>Font<select id="replacementFont"></select></label>
             <label>Background color<input id="replacementBackground" type="color" value="#ffffff"></label>
-            <p>Pick up the area to keep its appearance, or type a replacement. The original content stays under the cover.</p>
-            <div class="dialog-actions"><button type="button" id="pickUpArea" class="btn">Pick up area</button><button type="submit" class="btn primary">Apply replacement</button></div>
+            <p>Remove, move, or replace this content. Export as a flattened PDF to leave out the covered source text.</p>
+            <div class="dialog-actions"><button type="button" id="removeSourceArea" class="btn danger">Remove from page</button><button type="button" id="pickUpArea" class="btn">Pick up area</button><button type="submit" class="btn primary">Apply replacement</button></div>
             <p id="replaceError" role="alert"></p>
         </form>
     </dialog>

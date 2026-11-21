@@ -63,3 +63,7 @@ The phone toolbar keeps Open, Undo, Redo and Save at the top. Use **More** for z
 **Save as** supports PDF for the full edited document, PNG or JPEG for the active page, and TXT for selectable text and text annotations. A visual cover leaves underlying source text available to text exports.
 
 In **Pages**, use the thumbnails to move, rotate, duplicate, or remove pages, or append other PDFs. The page order applies to the exported copy. Rotating a page applies to each duplicate of that page. **Find** searches selectable original text and jumps to matching pages. Image-only scans still require OCR.
+
+### Remove original page content
+
+Choose **Edit PDF text** and tap a highlighted source item, or use **Move area** to draw around content. Choose **Remove from page**. The edit places an opaque cover that you can undo. **Save as** defaults to **Flattened PDF** after a removal. That export rebuilds the document from the visible page images, with no source text layer or interactive annotations. Editable PDF and TXT exports can still contain the original text.
