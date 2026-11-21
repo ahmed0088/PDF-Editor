@@ -90,4 +90,4 @@ To replace a logo or visible signature already on a page, use **Move area**, dra
 
 **Open file** accepts PDF, PNG, JPEG, WebP, GIF, BMP, TXT, Markdown, CSV, and DOCX. Photos open as a one-page PDF for editing. GIF imports use a single frame. The text editor can open plain-text files or extract the text from a DOCX, then download TXT or open the edited text as a PDF. DOCX layout, images, and formatting are not imported. Standard-font text is selectable in the generated PDF and unsupported characters can use a rendered image fallback.
 
-**Layers** lists the current page's editable overlays. Rename, show, hide, reorder, or delete them with Undo support. The source PDF page is the background. Hidden overlays are excluded from exports. Rotation buttons show the exported orientation in a preview, and the editing canvas keeps the original coordinate orientation.
+**Layers** lists the current page's editable overlays. Rename, show, hide, reorder, or delete them with Undo support. The source PDF page is the background. Hidden overlays are excluded from exports. Rotation changes the editing view immediately and is included in the exported PDF.

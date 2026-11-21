@@ -377,10 +377,10 @@ function setupAreaSelection(wrapper, overlay) {
     let start;
     let marker;
     function point(event) {
-        const rect = overlay.getBoundingClientRect();
+        const local = pagePoint(wrapper, event);
         return {
-            x: Math.max(0, Math.min(wrapper.pdfViewport.width, event.clientX - rect.left)),
-            y: Math.max(0, Math.min(wrapper.pdfViewport.height, event.clientY - rect.top))
+            x: Math.max(0, Math.min(wrapper.pdfViewport.width, local.x)),
+            y: Math.max(0, Math.min(wrapper.pdfViewport.height, local.y))
         };
     }
     function bounds(event) {
@@ -458,23 +458,25 @@ async function addSourceTextTargets(wrapper) {
             let moved = false;
             target.addEventListener('pointerdown', event => {
                 if (event.button !== 0 || !event.isPrimary) return;
-                start = [event.clientX, event.clientY];
+                start = pagePoint(wrapper, event);
                 moved = false;
                 target.setPointerCapture(event.pointerId);
             });
             target.addEventListener('pointermove', event => {
                 if (!start || !event.isPrimary) return;
-                const dx = event.clientX - start[0];
-                const dy = event.clientY - start[1];
+                const point = pagePoint(wrapper, event);
+                const dx = point.x - start.x;
+                const dy = point.y - start.y;
                 if (Math.hypot(dx, dy) >= 5) moved = true;
                 if (moved) target.style.transform = `translate(${dx}px,${dy}px)`;
             });
             target.addEventListener('pointerup', event => {
                 if (!start || !event.isPrimary) return;
-                const [x, y] = start;
+                const point = pagePoint(wrapper, event);
+                const { x, y } = start;
                 start = null;
                 target.style.transform = '';
-                if (moved) pickUpSelection(selection, pageBackground(wrapper, rect), event.clientX - x, event.clientY - y);
+                if (moved) pickUpSelection(selection, pageBackground(wrapper, rect), point.x - x, point.y - y);
 
             });
             target.addEventListener('pointercancel', () => {

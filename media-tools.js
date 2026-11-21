@@ -1,15 +1,10 @@
 const layersDialog = document.getElementById('layers');
 const layerList = document.getElementById('layerList');
-const rotationDialog = document.getElementById('rotationPreview');
-const rotationImage = document.getElementById('rotationImage');
-const rotationStatus = document.getElementById('rotationPreviewStatus');
 const textImport = document.getElementById('textImport');
 const importedText = document.getElementById('importedText');
 const importLabel = document.getElementById('textImportLabel');
 const importError = document.getElementById('textImportError');
 let layerPageNumber;
-let rotationPageNumber;
-let rotationRender = 0;
 let importedName;
 let importBusy = false;
 
@@ -93,46 +88,6 @@ document.getElementById('btnLayers').addEventListener('click', () => {
     renderLayers();
     layersDialog.showModal();
 });
-
-async function showRotationImage() {
-    const render = ++rotationRender;
-    rotationStatus.textContent = 'Rendering preview…';
-    let documentToRender;
-    try {
-        const bytes = await buildEditedPDF([rotationPageNumber]);
-        if (render !== rotationRender) return;
-        documentToRender = await pdfjsLib.getDocument({ data: bytes, isEvalSupported: false }).promise;
-        const page = await documentToRender.getPage(1);
-        const base = page.getViewport({ scale: 1 });
-        const viewport = page.getViewport({ scale: Math.min(800 / base.width, 800 / base.height) });
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.ceil(viewport.width);
-        canvas.height = Math.ceil(viewport.height);
-        await page.render({ canvasContext: canvas.getContext('2d'), viewport, background: '#fff' }).promise;
-        if (render !== rotationRender) return;
-        rotationImage.replaceChildren(canvas);
-        rotationStatus.textContent = `Page ${rotationPageNumber} · ${page.rotate}° in export`;
-    } catch (error) {
-        if (render === rotationRender) rotationStatus.textContent = `Could not render the preview. ${error.message}`;
-    } finally {
-        await documentToRender?.destroy().catch(() => {});
-    }
-}
-
-function openRotationPreview(amount) {
-    if (!state.pdfDoc) return;
-    if (!rotationDialog.open) {
-        rotationPageNumber = state.currentPage;
-        rotationImage.replaceChildren();
-        rotationDialog.showModal();
-    }
-    rotatePage(rotationPageNumber, amount);
-    showRotationImage();
-}
-
-document.getElementById('previewRotateLeft').addEventListener('click', () => openRotationPreview(-90));
-document.getElementById('previewRotateRight').addEventListener('click', () => openRotationPreview(90));
-rotationDialog.addEventListener('close', () => { rotationRender++; });
 
 function importStem(name) {
     return name.replace(/\.[^.]+$/, '') || 'document';

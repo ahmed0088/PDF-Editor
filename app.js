@@ -152,7 +152,7 @@ function init() {
     }
     more.addEventListener('click', () => setMenu(more.getAttribute('aria-expanded') !== 'true'));
     menu.addEventListener('click', event => {
-        if (event.target.closest('button') && !event.target.closest('.zoom-controls, .rotation-controls')) setMenu(false);
+        if (event.target.closest('button') && !event.target.closest('.zoom-controls')) setMenu(false);
     });
     document.addEventListener('click', event => {
         if (!menu.contains(event.target) && !more.contains(event.target)) setMenu(false);
@@ -261,6 +261,32 @@ function downloadBlob(blob, name) {
     setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 
+function applyPageRotation(wrapper) {
+    const { width, height } = wrapper.pdfViewport;
+    const rotation = state.pageRotations.get(Number(wrapper.dataset.pageNum)) || 0;
+    const sideways = rotation === 90 || rotation === 270;
+    const slot = wrapper.parentElement;
+    slot.style.width = `${sideways ? height : width}px`;
+    slot.style.height = `${sideways ? width : height}px`;
+    const translations = { 90: [height, 0], 180: [width, height], 270: [0, width] };
+    const [x, y] = translations[rotation] || [0, 0];
+    wrapper.style.transform = rotation ? `translate(${x}px, ${y}px) rotate(${rotation}deg)` : '';
+    wrapper.dataset.rotation = String(rotation);
+}
+
+function pagePoint(wrapper, event) {
+    const bounds = wrapper.getBoundingClientRect();
+    const x = event.clientX - bounds.left;
+    const y = event.clientY - bounds.top;
+    const { width, height } = wrapper.pdfViewport;
+    switch (Number(wrapper.dataset.rotation)) {
+        case 90: return { x: y, y: height - x };
+        case 180: return { x: width - x, y: height - y };
+        case 270: return { x: width - y, y: x };
+        default: return { x, y };
+    }
+}
+
 async function renderPages() {
     if (!state.pdfDoc) return;
     setSelection(null);
@@ -297,7 +323,11 @@ async function renderPages() {
         // Draw existing elements for this page
         renderPageEdits(wrapper, i);
 
-        viewer.appendChild(wrapper);
+        const slot = document.createElement('div');
+        slot.className = 'page-slot';
+        slot.append(wrapper);
+        applyPageRotation(wrapper);
+        viewer.append(slot);
         wrapper.addEventListener('click', () => {
             state.currentPage = i;
             updatePageControls();
@@ -311,8 +341,8 @@ async function renderPages() {
         overlay.addEventListener('click', event => {
             if (state.tool === 'signature' && signatureTapStarted) placeSignature(event, wrapper);
             if (state.tool === 'text' && event.target === overlay) {
-                const rect = overlay.getBoundingClientRect();
-                createTextElement(event.clientX - rect.left, event.clientY - rect.top, i, viewport, wrapper);
+                const { x, y } = pagePoint(wrapper, event);
+                createTextElement(x, y, i, viewport, wrapper);
             }
             signatureTapStarted = false;
         });
@@ -368,9 +398,7 @@ function setupOverlayEvents(overlay, pageNum, viewport) {
 
         setSelection(null);
 
-        const rect = overlay.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const { x, y } = pagePoint(overlay.parentElement, e);
 
         if (state.tool === 'whiteout' || state.tool === 'highlight' || state.tool === 'rectangle') {
             isDrawing = true;
@@ -403,9 +431,9 @@ function setupOverlayEvents(overlay, pageNum, viewport) {
 
     overlay.addEventListener('pointermove', (e) => {
         if (!isDrawing) return;
-        const rect = overlay.getBoundingClientRect();
-        let x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
-        let y = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
+        const point = pagePoint(overlay.parentElement, e);
+        const x = Math.max(0, Math.min(point.x, viewport.width));
+        const y = Math.max(0, Math.min(point.y, viewport.height));
 
         if (state.tool === 'whiteout' || state.tool === 'highlight' || state.tool === 'rectangle') {
             const w = Math.abs(x - startX);
@@ -700,8 +728,9 @@ let globalDragReady = false;
 function startElementDrag(e, el, isResize) {
     dragTarget = el;
     dragType = isResize ? 'resize' : 'move';
-    dragStartX = e.clientX;
-    dragStartY = e.clientY;
+    const point = pagePoint(el.parentElement, e);
+    dragStartX = point.x;
+    dragStartY = point.y;
 
     elStartX = parseFloat(el.style.left);
     elStartY = parseFloat(el.style.top);
@@ -728,8 +757,9 @@ function setupGlobalDrag() {
         if (!dragTarget) return;
         e.preventDefault();
 
-        const dx = e.clientX - dragStartX;
-        const dy = e.clientY - dragStartY;
+        const point = pagePoint(dragTarget.parentElement, e);
+        const dx = point.x - dragStartX;
+        const dy = point.y - dragStartY;
 
         if (dragType === 'move') {
             dragTarget.style.left = (elStartX + dx) + 'px';
@@ -837,7 +867,10 @@ function moveHistory(offset) {
     state.historyIndex = index;
     state.elements = structuredClone(snapshot.elements);
     state.pageRotations = new Map(snapshot.rotations);
-    viewer.querySelectorAll('.page-wrapper').forEach(wrapper => renderPageEdits(wrapper, Number(wrapper.dataset.pageNum)));
+    viewer.querySelectorAll('.page-wrapper').forEach(wrapper => {
+        applyPageRotation(wrapper);
+        renderPageEdits(wrapper, Number(wrapper.dataset.pageNum));
+    });
     updateUndoRedoButtons();
     setStatus(offset < 0 ? 'Undo complete' : 'Redo complete');
     rememberDocument();
@@ -967,7 +1000,10 @@ async function fitPageWidth() {
     const viewerContainer = document.getElementById('viewer-container');
     const styles = getComputedStyle(viewerContainer);
     const width = viewerContainer.clientWidth - parseFloat(styles.paddingLeft) - parseFloat(styles.paddingRight);
-    state.scale = Math.max(0.15, Math.min(3, width / page.getViewport({ scale: 1 }).width));
+    const pageSize = page.getViewport({ scale: 1 });
+    const rotation = state.pageRotations.get(state.currentPage) || 0;
+    const fittedWidth = rotation % 180 ? pageSize.height : pageSize.width;
+    state.scale = Math.max(0.15, Math.min(3, width / fittedWidth));
     zoomLevelText.textContent = Math.round(state.scale * 100) + '%';
 }
 
@@ -981,12 +1017,15 @@ document.getElementById('btnFitWidth').addEventListener('click', async () => {
 function rotatePage(number, amount) {
     if (!state.pdfDoc) return;
     const current = state.pageRotations.get(number) || 0;
-    state.pageRotations.set(number, (current + amount + 360) % 360);
+    const rotation = (current + amount + 360) % 360;
+    state.pageRotations.set(number, rotation);
+    const wrapper = viewer.querySelector(`[data-page-num="${number}"]`);
+    if (wrapper) applyPageRotation(wrapper);
     saveHistory();
-    setStatus(`Page ${number} rotation set to ${state.pageRotations.get(number)}° · applied on export`);
+    setStatus(`Page ${number} rotated ${rotation}°`);
 }
-document.getElementById('btnRotateLeft').addEventListener('click', () => openRotationPreview(-90));
-document.getElementById('btnRotateRight').addEventListener('click', () => openRotationPreview(90));
+document.getElementById('btnRotateLeft').addEventListener('click', () => rotatePage(state.currentPage, -90));
+document.getElementById('btnRotateRight').addEventListener('click', () => rotatePage(state.currentPage, 90));
 btnClearPage.addEventListener('click', () => {
     if (!state.elements.get(state.currentPage)?.length) {
         setStatus('No edits to clear on this page');

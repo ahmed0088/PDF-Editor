@@ -705,7 +705,8 @@ button, label { user-select: none; }
 #layerList li { display: grid; gap: 5px; padding: 8px; background: var(--panel-strong); border-radius: 8px; }
 .layer-actions { display: flex; flex-wrap: wrap; gap: 5px; }
 .layer-actions .btn { min-height: 34px; padding-inline: 8px; }
-#rotationImage { display: grid; justify-items: center; min-height: 80px; margin: 0 0 10px; background: var(--panel-strong); border-radius: 10px; }
-#rotationImage canvas { display: block; max-width: 100%; max-height: 55dvh; object-fit: contain; }
 #textImport { width: min(650px, calc(100% - 20px)); }
 #textImport textarea { min-height: 140px; }
+
+.page-slot { position: relative; flex: none; }
+.page-slot > .page-wrapper { position: absolute; inset: 0 auto auto 0; transform-origin: top left; }

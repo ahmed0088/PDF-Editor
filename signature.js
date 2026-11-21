@@ -148,7 +148,7 @@ signatureForm.addEventListener('submit', async event => {
 function placeSignature(event, wrapper) {
     if (!pendingSignature || pendingSignature.pdf !== state.pdfDoc) return;
     const viewport = wrapper.pdfViewport;
-    const bounds = wrapper.getBoundingClientRect();
+    const point = pagePoint(wrapper, event);
     const pageWidth = viewport.width / viewport.scale;
     const pageHeight = viewport.height / viewport.scale;
     const pageNum = Number(wrapper.dataset.pageNum);
@@ -156,8 +156,8 @@ function placeSignature(event, wrapper) {
     const ratio = Math.min(150 / image.width, 52 / image.height, pageWidth / image.width, pageHeight / image.height);
     const w = image.width * ratio;
     const h = image.height * ratio;
-    const x = Math.max(0, Math.min(pageWidth - w, (event.clientX - bounds.left) / viewport.scale - w / 2));
-    const y = Math.max(0, Math.min(pageHeight - h, pageHeight - (event.clientY - bounds.top) / viewport.scale - h / 2));
+    const x = Math.max(0, Math.min(pageWidth - w, point.x / viewport.scale - w / 2));
+    const y = Math.max(0, Math.min(pageHeight - h, pageHeight - point.y / viewport.scale - h / 2));
     const data = { type: 'image', signature: true, src: image.bytes, x, y, w, h };
     const elements = state.elements.get(pageNum) || [];
     elements.push(data);
