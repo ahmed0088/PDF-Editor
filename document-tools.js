@@ -210,13 +210,18 @@ function areaSelection(wrapper, rect, text) {
 const sourceActions = document.getElementById('sourceActions');
 const sourceSelectionCount = document.getElementById('sourceSelectionCount');
 const editSelectedSource = document.getElementById('editSelectedSource');
+const deleteSelectedSource = document.getElementById('deleteSelectedSource');
+const clearSelectedSource = document.getElementById('clearSelectedSource');
 const selectedSourceText = new Map();
 
 function updateSourceTextActions() {
     const count = selectedSourceText.size;
-    sourceActions.hidden = count === 0;
+    sourceActions.hidden = !state.pdfDoc || state.tool !== 'replace';
     editSelectedSource.disabled = count !== 1;
-    sourceSelectionCount.textContent = `${count} selected`;
+    deleteSelectedSource.disabled = count === 0;
+    sourceSelectionCount.textContent = count ? `${count} selected` : 'Select text';
+    clearSelectedSource.textContent = count ? 'Clear' : 'Done';
+    clearSelectedSource.setAttribute('aria-label', count ? 'Clear selection' : 'Done editing PDF text');
 }
 
 function toggleSourceText(target, selection, value) {
@@ -246,7 +251,7 @@ function deleteSourceTextSelection() {
         return false;
     }
     commitAreaEdits(edits);
-    setStatus(`${edits.length} item${edits.length === 1 ? '' : 's'} covered. Export as a flattened PDF to omit the original text.`);
+    setStatus(`${edits.length} item${edits.length === 1 ? '' : 's'} covered. Select more text or save a flattened PDF.`);
     return true;
 }
 
@@ -255,8 +260,16 @@ editSelectedSource.addEventListener('click', () => {
     const { selection, value } = selectedSourceText.values().next().value;
     openAreaEditor(selection, value);
 });
-bindDialogTap(document.getElementById('deleteSelectedSource'), deleteSourceTextSelection);
-document.getElementById('clearSelectedSource').addEventListener('click', clearSourceTextSelection);
+bindDialogTap(deleteSelectedSource, deleteSourceTextSelection);
+clearSelectedSource.addEventListener('click', () => {
+    if (selectedSourceText.size) {
+        clearSourceTextSelection();
+        return;
+    }
+    state.tool = 'select';
+    updateToolUI();
+    document.querySelector('[data-tool="select"]').focus({ preventScroll: true });
+});
 
 function openAreaEditor(selection, value = '') {
     if (replaceTextDialog.open) return;
@@ -272,26 +285,53 @@ function openAreaEditor(selection, value = '') {
     else document.getElementById('removeSourceArea').focus({ preventScroll: true });
 }
 
+function updateCoveredSourceTargets(wrapper, pageNum) {
+    const masks = (state.elements.get(pageNum) || []).filter(element =>
+        (element.sourceMask || element.sourceRemoval) && element.opacity === 1);
+    let changed = false;
+    for (const target of wrapper.querySelectorAll('.source-text-targets button')) {
+        const box = target.sourceBox;
+        const covered = masks.some(mask =>
+            mask.x <= box.x + .05 && mask.y <= box.y + .05 &&
+            mask.x + mask.w >= box.x + box.w - .05 && mask.y + mask.h >= box.y + box.h - .05);
+        target.hidden = covered;
+        if (covered && selectedSourceText.delete(target)) {
+            target.setAttribute('aria-pressed', 'false');
+            changed = true;
+        }
+    }
+    if (changed) updateSourceTextActions();
+}
+
 function commitAreaEdits(edits) {
     let selected;
+    const updatedPages = new Map();
+    const moving = edits.some(({ overlay }) => overlay?.type === 'image');
+    const focusedSource = document.activeElement?.closest('.source-text-targets');
     for (const { selection, overlay, background } of edits) {
         const { wrapper, pageNum, box } = selection;
         if (!wrapper.isConnected) continue;
-        const cover = { ...box, type: 'shape', color: background, opacity: 1, sourceRemoval: !overlay };
+        const cover = { ...box, type: 'shape', color: background, opacity: 1, sourceMask: true, sourceRemoval: !overlay };
         const elements = state.elements.get(pageNum) || [];
         elements.push(cover);
         if (overlay) elements.push(overlay);
         state.elements.set(pageNum, elements);
         const coverElement = createDOMElement(cover, wrapper, pageNum, wrapper.pdfViewport);
         selected = overlay ? createDOMElement(overlay, wrapper, pageNum, wrapper.pdfViewport) : coverElement;
+        updatedPages.set(wrapper, pageNum);
         state.currentPage = pageNum;
     }
     if (!selected) return;
-    state.tool = 'select';
+    clearSourceTextSelection();
+    if (moving) state.tool = 'select';
+    updatedPages.forEach((pageNum, wrapper) => updateCoveredSourceTargets(wrapper, pageNum));
     if (replaceTextDialog.open) replaceTextDialog.close();
     updatePageControls();
     updateToolUI();
-    setSelection(edits.length === 1 && edits[0].overlay ? selected : null);
+    setSelection(moving ? selected : null);
+    if (focusedSource && state.tool === 'replace') {
+        focusedSource.querySelector('button:not([hidden])')?.focus({ preventScroll: true });
+    }
     saveHistory();
 }
 
@@ -402,6 +442,7 @@ async function addSourceTextTargets(wrapper) {
             });
             const target = document.createElement('button');
             target.type = 'button';
+            target.sourceBox = selection.box;
             const value = item.str.trim();
             target.setAttribute('aria-label', `Select text: ${value}`);
             target.setAttribute('aria-pressed', 'false');
@@ -452,6 +493,7 @@ async function addSourceTextTargets(wrapper) {
         }
         if (!layer.childElementCount) layer.textContent = 'Use Move area for scanned, outlined, or angled text on this page.';
         wrapper.append(layer);
+        updateCoveredSourceTargets(wrapper, Number(wrapper.dataset.pageNum));
         wrapper.dataset.textTargets = 'ready';
     } catch (error) {
         if (wrapper.isConnected && state.tool === 'replace') setStatus(`Could not read text. Try Move area. ${error.message}`);
@@ -505,7 +547,7 @@ document.getElementById('replaceTextForm').addEventListener('submit', event => {
     }
     applyAreaEdit(sourceSelection, { ...sourceSelection.text, type: 'text', text: value,
         font: replacementFont.value, color: propertyInputs.textColor.value }, replacementBackground.value);
-    setStatus('Replacement added. Drag it to adjust its placement.');
+    setStatus(state.tool === 'replace' ? 'Text updated. Select another item to keep editing.' : 'Text updated. Draw another area to keep editing.');
 });
 
 function renderTextImage(element, font = textFontStyle(element.font, element.size)) {

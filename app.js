@@ -128,6 +128,7 @@ function updateSelectedProperty(name, value) {
     const wrapper = selected.parentElement;
     const replacement = createDOMElement(data, wrapper, Number(selected.dataset.page), wrapper.pdfViewport);
     selected.replaceWith(replacement);
+    if (data.sourceMask) updateCoveredSourceTargets(wrapper, Number(selected.dataset.page));
     setSelection(replacement);
     saveHistory();
     setStatus('Property updated');
@@ -325,7 +326,10 @@ async function renderPages() {
 
 // --- Tools & Interaction Logic ---
 function updateToolUI() {
-    if (state.pdfDoc && state.tool !== 'replace') clearSourceTextSelection();
+    if (state.pdfDoc) {
+        if (state.tool === 'replace') updateSourceTextActions();
+        else clearSourceTextSelection();
+    }
     updatePropertyGroups();
     toolBtns.forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tool === state.tool);
@@ -775,6 +779,7 @@ function setupGlobalDrag() {
         updateStateData(newData, pageNum, previousStateData);
         dragTarget.elData = newData;
         dragTarget.stateData = newData;
+        if (newData.sourceMask) updateCoveredSourceTargets(container, pageNum);
 
         saveHistory();
         dragTarget = null;
@@ -818,6 +823,7 @@ function renderPageEdits(wrapper, pageNum) {
     wrapper.querySelectorAll(':scope > .editor-element, :scope > .saved-drawing').forEach(element => element.remove());
     const elements = state.elements.get(pageNum) || [];
     elements.forEach(data => createDOMElement(data, wrapper, pageNum, wrapper.pdfViewport));
+    updateCoveredSourceTargets(wrapper, pageNum);
 }
 
 function moveHistory(offset) {
@@ -973,6 +979,7 @@ btnDelete.addEventListener('click', () => {
     const pageEls = state.elements.get(pageNum) || [];
     const idx = pageEls.indexOf(selected.stateData);
     if (idx !== -1) pageEls.splice(idx, 1);
+    updateCoveredSourceTargets(container, pageNum);
 
     setSelection(null);
     saveHistory();

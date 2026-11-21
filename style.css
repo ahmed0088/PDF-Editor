@@ -609,3 +609,5 @@ button, label { user-select: none; }
 .source-text-targets button[aria-pressed="true"] { border-color: #304bd4; background: #667bff49; outline: 1px solid #304bd4; }
 .editor-element:focus-visible { outline: 2px solid var(--accent); }
 @media (max-width: 620px) { #sourceActions { bottom: 70px; } }
+
+.source-text-targets button[hidden] { display: none; }
