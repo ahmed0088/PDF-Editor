@@ -75,6 +75,7 @@ function goToPage(page) {
 function setSelection(element) {
     document.querySelectorAll('.editor-element').forEach(el => el.classList.remove('selected'));
     state.selectedEl = element || null;
+    if (element) clearSourceTextSelection();
     propertyInputs.opacity.disabled = Boolean(element?.elData?.sourceRemoval);
     updatePropertyGroups();
     if (element) {
@@ -261,6 +262,7 @@ function downloadBlob(blob, name) {
 async function renderPages() {
     if (!state.pdfDoc) return;
     setSelection(null);
+    clearSourceTextSelection();
     dragTarget = null;
     viewer.replaceChildren();
     const renderVersion = ++state.renderVersion;
@@ -323,6 +325,7 @@ async function renderPages() {
 
 // --- Tools & Interaction Logic ---
 function updateToolUI() {
+    if (state.pdfDoc && state.tool !== 'replace') clearSourceTextSelection();
     updatePropertyGroups();
     toolBtns.forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tool === state.tool);
@@ -333,7 +336,7 @@ function updateToolUI() {
     if (state.tool === 'replace') {
         document.querySelectorAll('.page-wrapper').forEach(addSourceTextTargets);
     }
-    const names = { signature: 'Tap or click where you want the signature', replace: 'Tap existing text to edit it, or drag it to move it', area: 'Draw a box around content to pick it up or replace it', select: matchMedia('(pointer: coarse)').matches ? 'Select, pan, or pinch to zoom' : 'Select and move', text: 'Click anywhere to type', whiteout: 'Drag to cover content', highlight: 'Drag to highlight', rectangle: 'Drag to add a rectangle', draw: 'Draw or sign' };
+    const names = { signature: 'Tap or click where you want the signature', replace: 'Tap text to select it. Use Edit or Delete, or drag text to move it.', area: 'Draw a box around content to pick it up or replace it', select: matchMedia('(pointer: coarse)').matches ? 'Select, pan, or pinch to zoom' : 'Select and move', text: 'Click anywhere to type', whiteout: 'Drag to cover content', highlight: 'Drag to highlight', rectangle: 'Drag to add a rectangle', draw: 'Draw or sign' };
     setStatus(state.pdfDoc ? names[state.tool] : 'Ready — open a PDF to begin');
 }
 
@@ -647,6 +650,18 @@ function createDOMElement(elData, container, pageNum, viewport) {
     // Store data object on the element for easy retrieval
     div.elData = JSON.parse(JSON.stringify(elData));
     div.stateData = elData;
+    div.tabIndex = 0;
+    div.setAttribute('role', 'button');
+    div.setAttribute('aria-label', elData.type === 'text' ? `Added text: ${elData.text}` : `Added ${elData.signature ? 'signature' : elData.type}`);
+    div.addEventListener('focus', () => {
+        if (state.tool === 'select') setSelection(div);
+    });
+    div.addEventListener('keydown', event => {
+        if (state.tool !== 'select' || (event.key !== 'Enter' && event.key !== ' ')) return;
+        event.preventDefault();
+        setSelection(div);
+        if (event.key === 'Enter' && elData.type === 'text') editTextElement(div);
+    });
 
     // Setup Element Drag/Select
     div.addEventListener('pointerdown', (e) => {
@@ -810,6 +825,7 @@ function moveHistory(offset) {
     if (index < 0 || index >= state.history.length) return;
     cancelElementDrag();
     setSelection(null);
+    clearSourceTextSelection();
     const snapshot = state.history[index];
     state.historyIndex = index;
     state.elements = structuredClone(snapshot.elements);
@@ -978,8 +994,18 @@ window.addEventListener('keydown', (e) => {
         else undo();
         return;
     }
-    if (e.key === 'Delete' || e.key === 'Backspace') { if (state.selectedEl) btnDelete.click(); }
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (e.repeat) return;
+        if (deleteSourceTextSelection()) {
+            e.preventDefault();
+        } else if (state.selectedEl) {
+            e.preventDefault();
+            btnDelete.click();
+        }
+        return;
+    }
     if (e.key === 'Escape') {
+        clearSourceTextSelection();
         if (state.tool === 'signature') {
             state.tool = 'select';
             updateToolUI();

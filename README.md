@@ -67,3 +67,5 @@ In **Pages**, use the thumbnails to move, rotate, duplicate, or remove pages, or
 ### Remove original page content
 
 Choose **Edit PDF text** and tap a highlighted source item, or use **Move area** to draw around content. Choose **Remove from page**. The edit places an opaque cover that you can undo. **Save as** defaults to **Flattened PDF** after a removal. That export rebuilds the document from the visible page images, with no source text layer or interactive annotations. Editable PDF and TXT exports can still contain the original text.
+
+In **Edit PDF text**, tap or click text boxes to toggle them in the selection. With one item selected, choose **Edit** or press **Enter** while it is focused. Use the **Delete** button, **Delete**, or **Backspace** to remove the selection in one undoable action. **Clear** or **Escape** deselects the items.

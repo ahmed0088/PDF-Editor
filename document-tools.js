@@ -207,6 +207,57 @@ function areaSelection(wrapper, rect, text) {
     };
 }
 
+const sourceActions = document.getElementById('sourceActions');
+const sourceSelectionCount = document.getElementById('sourceSelectionCount');
+const editSelectedSource = document.getElementById('editSelectedSource');
+const selectedSourceText = new Map();
+
+function updateSourceTextActions() {
+    const count = selectedSourceText.size;
+    sourceActions.hidden = count === 0;
+    editSelectedSource.disabled = count !== 1;
+    sourceSelectionCount.textContent = `${count} selected`;
+}
+
+function toggleSourceText(target, selection, value) {
+    setSelection(null);
+    if (selectedSourceText.has(target)) {
+        selectedSourceText.delete(target);
+        target.setAttribute('aria-pressed', 'false');
+    } else {
+        selectedSourceText.set(target, { selection, value });
+        target.setAttribute('aria-pressed', 'true');
+    }
+    updateSourceTextActions();
+}
+
+function clearSourceTextSelection() {
+    for (const target of selectedSourceText.keys()) target.setAttribute('aria-pressed', 'false');
+    selectedSourceText.clear();
+    updateSourceTextActions();
+}
+
+function deleteSourceTextSelection() {
+    if (!selectedSourceText.size) return false;
+    const edits = [...selectedSourceText.values()].filter(({ selection }) => selection.wrapper.isConnected)
+        .map(({ selection }) => ({ selection, background: pageBackground(selection.wrapper, selection.rect) }));
+    if (!edits.length) {
+        clearSourceTextSelection();
+        return false;
+    }
+    commitAreaEdits(edits);
+    setStatus(`${edits.length} item${edits.length === 1 ? '' : 's'} covered. Export as a flattened PDF to omit the original text.`);
+    return true;
+}
+
+editSelectedSource.addEventListener('click', () => {
+    if (selectedSourceText.size !== 1) return;
+    const { selection, value } = selectedSourceText.values().next().value;
+    openAreaEditor(selection, value);
+});
+bindDialogTap(document.getElementById('deleteSelectedSource'), deleteSourceTextSelection);
+document.getElementById('clearSelectedSource').addEventListener('click', clearSourceTextSelection);
+
 function openAreaEditor(selection, value = '') {
     if (replaceTextDialog.open) return;
     sourceSelection = selection;
@@ -221,23 +272,31 @@ function openAreaEditor(selection, value = '') {
     else document.getElementById('removeSourceArea').focus({ preventScroll: true });
 }
 
-function applyAreaEdit(selection, overlay, background) {
-    const { wrapper, pageNum, box } = selection;
-    if (!wrapper.isConnected) return;
-    const cover = { ...box, type: 'shape', color: background, opacity: 1, sourceRemoval: !overlay };
-    const elements = state.elements.get(pageNum) || [];
-    elements.push(cover);
-    if (overlay) elements.push(overlay);
-    state.elements.set(pageNum, elements);
-    const coverElement = createDOMElement(cover, wrapper, pageNum, wrapper.pdfViewport);
-    const selected = overlay ? createDOMElement(overlay, wrapper, pageNum, wrapper.pdfViewport) : coverElement;
-    state.currentPage = pageNum;
+function commitAreaEdits(edits) {
+    let selected;
+    for (const { selection, overlay, background } of edits) {
+        const { wrapper, pageNum, box } = selection;
+        if (!wrapper.isConnected) continue;
+        const cover = { ...box, type: 'shape', color: background, opacity: 1, sourceRemoval: !overlay };
+        const elements = state.elements.get(pageNum) || [];
+        elements.push(cover);
+        if (overlay) elements.push(overlay);
+        state.elements.set(pageNum, elements);
+        const coverElement = createDOMElement(cover, wrapper, pageNum, wrapper.pdfViewport);
+        selected = overlay ? createDOMElement(overlay, wrapper, pageNum, wrapper.pdfViewport) : coverElement;
+        state.currentPage = pageNum;
+    }
+    if (!selected) return;
     state.tool = 'select';
     if (replaceTextDialog.open) replaceTextDialog.close();
     updatePageControls();
     updateToolUI();
-    setSelection(selected);
+    setSelection(edits.length === 1 && edits[0].overlay ? selected : null);
     saveHistory();
+}
+
+function applyAreaEdit(selection, overlay, background) {
+    commitAreaEdits([{ selection, overlay, background }]);
 }
 
 async function pickUpSelection(selection, background, dx = 0, dy = 0) {
@@ -343,7 +402,10 @@ async function addSourceTextTargets(wrapper) {
             });
             const target = document.createElement('button');
             target.type = 'button';
-            target.setAttribute('aria-label', `Edit text: ${item.str.trim()}`);
+            const value = item.str.trim();
+            target.setAttribute('aria-label', `Select text: ${value}`);
+            target.setAttribute('aria-pressed', 'false');
+            target.setAttribute('aria-keyshortcuts', 'Enter Space');
             Object.assign(target.style, { left: `${rect.left}px`, top: `${rect.top}px`,
                 width: `${rect.right - rect.left}px`, height: `${rect.bottom - rect.top}px` });
             // Short labels should receive the tap when an oversized text run overlaps them.
@@ -369,7 +431,7 @@ async function addSourceTextTargets(wrapper) {
                 start = null;
                 target.style.transform = '';
                 if (moved) pickUpSelection(selection, pageBackground(wrapper, rect), event.clientX - x, event.clientY - y);
-                else if (event.pointerType === 'touch') openAreaEditor(selection, item.str.trim());
+
             });
             target.addEventListener('pointercancel', () => {
                 start = null;
@@ -377,8 +439,14 @@ async function addSourceTextTargets(wrapper) {
                 target.style.transform = '';
             });
             target.addEventListener('click', event => {
-                if (!moved || event.detail === 0) openAreaEditor(selection, item.str.trim());
+                if (state.tool === 'replace' && (!moved || event.detail === 0)) toggleSourceText(target, selection, value);
                 moved = false;
+            });
+            target.addEventListener('keydown', event => {
+                if (event.key !== 'Enter') return;
+                event.preventDefault();
+                if (selectedSourceText.size === 1 && selectedSourceText.has(target)) openAreaEditor(selection, value);
+                else if (!selectedSourceText.has(target)) toggleSourceText(target, selection, value);
             });
             layer.append(target);
         }

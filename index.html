@@ -66,11 +66,17 @@
 
     <!-- Main Workspace -->
     <main id="workspace">
+        <div id="sourceActions" hidden role="group" aria-label="Selected PDF text">
+            <span id="sourceSelectionCount" role="status"></span>
+            <button id="editSelectedSource" type="button" class="btn">Edit</button>
+            <button id="deleteSelectedSource" type="button" class="btn danger" aria-keyshortcuts="Delete Backspace">Delete</button>
+            <button id="clearSelectedSource" type="button" class="btn" aria-label="Clear selection">Clear</button>
+        </div>
         <!-- Left Sidebar: Tools -->
         <aside id="tool-sidebar">
             <button class="tool-btn active" data-tool="select" title="Select and move (V)"><span>↖</span><small>Select</small></button>
             <button class="tool-btn" data-tool="text" title="Add text (T)"><span>T</span><small>Text</small></button>
-            <button class="tool-btn" data-tool="replace" title="Replace or move PDF text (E)"><span>↔</span><small>Edit PDF text</small></button>
+            <button class="tool-btn" data-tool="replace" title="Select, edit, or remove PDF text (E)"><span>↔</span><small>Edit PDF text</small></button>
             <button class="tool-btn" data-tool="area" title="Select a page area (M)"><span>⊞</span><small>Move area</small></button>
             <button class="tool-btn" data-tool="whiteout" title="Cover visually; underlying content remains (R)"><span>□</span><small>Cover</small></button>
             <button class="tool-btn" data-tool="highlight" title="Highlight (H)"><span>▰</span><small>Mark</small></button>

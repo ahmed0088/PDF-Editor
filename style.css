@@ -583,3 +583,29 @@ button, label { user-select: none; }
 #properties-sidebar[data-mode="draw"] #prop-draw { display: flex; }
 
 .editor-element.source-removal { cursor: pointer; }
+
+#workspace { position: relative; }
+#sourceActions {
+    position: absolute;
+    left: 50%;
+    bottom: 14px;
+    z-index: 24;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-width: calc(100% - 16px);
+    padding: 7px;
+    border: 1px solid #405588;
+    border-radius: 12px;
+    color: #f7f9ff;
+    background: #152344;
+    box-shadow: 0 10px 28px #080e1e44;
+    white-space: nowrap;
+}
+#sourceActions[hidden] { display: none; }
+#sourceSelectionCount { padding-inline: 5px; font-size: .8rem; font-weight: 650; }
+#sourceActions .btn { min-height: 42px; padding-inline: 9px; touch-action: manipulation; }
+.source-text-targets button[aria-pressed="true"] { border-color: #304bd4; background: #667bff49; outline: 1px solid #304bd4; }
+.editor-element:focus-visible { outline: 2px solid var(--accent); }
+@media (max-width: 620px) { #sourceActions { bottom: 70px; } }
