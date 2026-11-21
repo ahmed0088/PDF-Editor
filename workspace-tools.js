@@ -159,7 +159,7 @@ function downloadName(stem, extension) {
 
 function hasSourceRemoval(order) {
     return [...state.elements].some(([page, elements]) =>
-        (!order || order.includes(page)) && elements.some(element => element.sourceRemoval));
+        (!order || order.includes(page)) && elements.some(element => !element.hidden && element.sourceRemoval));
 }
 
 async function renderExportPage(page, annotations = true) {
@@ -208,7 +208,7 @@ async function exportDocument({ format = 'pdf', name = fileStem(), order, append
                 const page = await state.pdfDoc.getPage(i);
                 const content = await page.getTextContent();
                 const rows = extractPageRows(content.items, i).map(row => row.text);
-                const annotations = (state.elements.get(i) || []).filter(item => item.type === 'text').map(item => item.text);
+                const annotations = (state.elements.get(i) || []).filter(item => item.type === 'text' && !item.hidden).map(item => item.text);
                 blocks.push([`Page ${i}`, ...rows, ...annotations].join('\n'));
             }
             blob = new Blob([blocks.join('\n\n')], { type: 'text/plain;charset=utf-8' });

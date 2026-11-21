@@ -24,8 +24,8 @@
         <div class="toolbar-document">
             <div class="brand"><span class="brand-mark" aria-hidden="true">✦</span><span>Pro PDF Editor</span></div>
             <label class="btn primary file-picker" id="btnOpen">
-                <span>Open PDF</span>
-                <input type="file" id="fileInput" accept="application/pdf,.pdf" aria-label="Open PDF">
+                <span>Open file</span>
+                <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.bmp,.txt,.md,.csv,.docx" aria-label="Open file">
             </label>
             <div class="history-controls" aria-label="Edit history" role="group">
                 <button id="btnUndo" class="btn" title="Undo (Ctrl/Cmd + Z)" disabled><span aria-hidden="true">↶</span> Undo</button>
@@ -60,6 +60,7 @@
                 <button id="btnRecent" class="btn" type="button">Recent</button>
                 <button id="btnFind" class="btn" type="button" disabled>Find</button>
                 <button id="btnVersions" class="btn" disabled>Versions</button>
+                <button id="btnLayers" class="btn" type="button" disabled>Layers</button>
                 <button id="btnPages" class="btn" disabled>Pages</button>
                 <button id="btnOrganize" class="btn organize" disabled>Auto-organize</button>
             </div>
@@ -93,9 +94,9 @@
         <section id="viewer-container">
             <div id="viewer" class="empty-state">
                 <div class="empty-icon">✦</div>
-                <h2>Drop a PDF here to start</h2>
-                <p>Open a document, then choose a tool to edit it privately in your browser.</p>
-                <button class="btn primary empty-action" id="btnChoose">Choose PDF</button>
+                <h2>Drop a file here to start</h2>
+                <p>Open a PDF, photo, or text document to start editing.</p>
+                <button class="btn primary empty-action" id="btnChoose">Choose file</button>
                 <button class="btn empty-action" id="btnEmptyRecent">Recent files</button>
             </div>
         </section>
@@ -229,6 +230,39 @@
                 <button class="btn primary">Download PDF</button>
             </div>
             <p id="pageExportError" role="alert"></p>
+        </form>
+    </dialog>
+    <dialog id="layers" class="compact-dialog" aria-labelledby="layersTitle">
+        <header class="organizer-header">
+            <div><h2 id="layersTitle">Layers</h2><p id="layerPage" class="dialog-note"></p></div>
+            <form method="dialog"><button class="btn">Close</button></form>
+        </header>
+        <ul id="layerList"></ul>
+        <p class="dialog-note">The original page is the background. Hidden layers stay in your project and are left out of downloads.</p>
+    </dialog>
+    <dialog id="rotationPreview" class="compact-dialog" aria-labelledby="rotationPreviewTitle">
+        <header class="organizer-header"><h2 id="rotationPreviewTitle">Page rotation</h2>
+            <form method="dialog"><button class="btn">Done</button></form>
+        </header>
+        <p id="rotationPreviewStatus" class="dialog-note" role="status"></p>
+        <div id="rotationImage"></div>
+        <div class="dialog-actions">
+            <button type="button" id="previewRotateLeft" class="btn">↶ Rotate left</button>
+            <button type="button" id="previewRotateRight" class="btn">↷ Rotate right</button>
+        </div>
+    </dialog>
+    <dialog id="textImport" class="compact-dialog" aria-labelledby="textImportTitle">
+        <form id="textImportForm">
+            <header class="organizer-header"><h2 id="textImportTitle">Text document</h2>
+                <button id="closeTextImport" class="btn" type="button">Close</button>
+            </header>
+            <p id="textImportLabel"></p>
+            <label>Document text<textarea id="importedText" dir="auto" rows="10" required></textarea></label>
+            <p id="textImportError" role="alert"></p>
+            <div class="dialog-actions">
+                <button id="downloadImportedText" class="btn" type="button">Download TXT</button>
+                <button class="btn primary">Open as PDF</button>
+            </div>
         </form>
     </dialog>
     <dialog id="appearance" class="compact-dialog" aria-labelledby="appearanceTitle">
@@ -392,5 +426,6 @@
     <script src="workspace-tools.js"></script>
     <script src="appearance.js"></script>
     <script src="cloud.js"></script>
+    <script src="media-tools.js"></script>
 </body>
 </html>

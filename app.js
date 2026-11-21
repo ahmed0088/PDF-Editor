@@ -56,6 +56,7 @@ function updatePageControls() {
     btnClearPage.disabled = !total;
     document.getElementById("btnOrganize").disabled = !total;
     document.getElementById("btnPages").disabled = !total;
+    document.getElementById("btnLayers").disabled = !total;
     document.getElementById("btnFind").disabled = !total;
     document.getElementById("btnSignature").disabled = !total;
     document.getElementById("btnVersions").disabled = !total;
@@ -177,7 +178,7 @@ document.getElementById('btnChoose').addEventListener('click', () => fileInput.c
 fileInput.addEventListener('change', () => {
     const file = fileInput.files[0];
     fileInput.value = '';
-    if (file) openPDF(file);
+    if (file) openEditorFile(file);
 });
 
 const dropZone = document.getElementById('viewer-container');
@@ -193,7 +194,7 @@ dropZone.addEventListener('drop', event => {
     event.preventDefault();
     dropZone.classList.remove('drop-target');
     const file = event.dataTransfer.files[0];
-    if (file) openPDF(file);
+    if (file) openEditorFile(file);
 });
 
 async function openPDF(file, draft) {
@@ -822,7 +823,7 @@ function saveHistory(persist = true) {
 function renderPageEdits(wrapper, pageNum) {
     wrapper.querySelectorAll(':scope > .editor-element, :scope > .saved-drawing').forEach(element => element.remove());
     const elements = state.elements.get(pageNum) || [];
-    elements.forEach(data => createDOMElement(data, wrapper, pageNum, wrapper.pdfViewport));
+    elements.filter(data => !data.hidden).forEach(data => createDOMElement(data, wrapper, pageNum, wrapper.pdfViewport));
     updateCoveredSourceTargets(wrapper, pageNum);
 }
 
@@ -984,8 +985,8 @@ function rotatePage(number, amount) {
     saveHistory();
     setStatus(`Page ${number} rotation set to ${state.pageRotations.get(number)}° · applied on export`);
 }
-document.getElementById('btnRotateLeft').addEventListener('click', () => rotatePage(state.currentPage, -90));
-document.getElementById('btnRotateRight').addEventListener('click', () => rotatePage(state.currentPage, 90));
+document.getElementById('btnRotateLeft').addEventListener('click', () => openRotationPreview(-90));
+document.getElementById('btnRotateRight').addEventListener('click', () => openRotationPreview(90));
 btnClearPage.addEventListener('click', () => {
     if (!state.elements.get(state.currentPage)?.length) {
         setStatus('No edits to clear on this page');
@@ -1170,7 +1171,7 @@ async function buildEditedPDF(pageOrder, appendFiles = []) {
             return { x: pdfX, y: pdfY };
         }
         if (rotation !== undefined) page.setRotation(degrees((originalRotation + rotation) % 360));
-        const els = state.elements.get(i) || [];
+        const els = (state.elements.get(i) || []).filter(element => !element.hidden);
 
         for (const el of els) {
             if (el.type === 'shape') {

@@ -290,7 +290,7 @@ function openAreaEditor(selection, value = '') {
 
 function updateCoveredSourceTargets(wrapper, pageNum) {
     const masks = (state.elements.get(pageNum) || []).filter(element =>
-        (element.sourceMask || element.sourceRemoval) && element.opacity === 1);
+        !element.hidden && (element.sourceMask || element.sourceRemoval) && element.opacity === 1);
     let changed = false;
     for (const target of wrapper.querySelectorAll('.source-text-targets button')) {
         const box = target.sourceBox;
